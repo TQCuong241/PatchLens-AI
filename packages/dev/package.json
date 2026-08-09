@@ -11,6 +11,9 @@
       "import": "./dist/index.js"
     }
   },
+  "bin": {
+    "patchlens": "./dist/bin.js"
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",

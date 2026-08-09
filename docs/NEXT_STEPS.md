@@ -15,7 +15,14 @@ The repository currently contains:
 - A source-context panel and chat anchored to the selection.
 - Desktop, Tablet, and Mobile preview presets with responsive-width rotation.
 - Selection rectangle and viewport metadata updates after preview resize.
-- A local daemon with health checks and a mock-agent response.
+- A documented competitive position centered on visual grounding, safe transactions, verification, and provider independence.
+- A local daemon with provider discovery, cancellation, active-selection sync, origin restrictions, and transaction history APIs.
+- A bounded context builder for sanitized DOM, computed styles, accessibility, viewport state, and runtime errors.
+- A provider-independent bridge with mock, Codex CLI, and Claude Code CLI adapters.
+- Read-only provider proposal mode followed by PatchLens-owned exact replacements.
+- Atomic multi-file transactions, explicit scope expansion, compensating rollback, durable JSON history, restart recovery, unified diffs, and conflict-aware undo.
+- Diff, History, scope approval, and safe undo surfaces in Studio.
+- A read-only MCP server and `patchlens mcp` command for external agents.
 - A React/Vite demo application.
 - CLI foundations for `patchlens init` and `patchlens doctor`.
 
@@ -99,18 +106,18 @@ Provide agents with enough structured context to understand the selected interfa
 
 ### Tasks
 
-1. Sanitize the selected DOM subtree.
-2. Remove passwords, tokens, form values, and known secret attributes.
-3. Capture a limited set of relevant computed styles.
-4. Capture accessibility name, role, and state.
-5. Capture the selected rectangle and measured viewport.
-6. Capture the active route, named responsive preset, and orientation.
+1. [x] Sanitize the selected DOM subtree.
+2. [x] Remove passwords, tokens, form values, event handlers, and known secret attributes.
+3. [x] Capture a limited set of relevant computed styles.
+4. [x] Capture accessibility name, role, and state.
+5. [x] Capture the selected rectangle and measured viewport.
+6. [x] Capture the active route, named responsive preset, and orientation.
 7. Capture selected-region screenshots.
-8. Capture current console and runtime errors.
+8. [x] Capture current window and unhandled-promise runtime errors.
 9. Discover related source and style files.
-10. Add payload size limits and truncation rules.
-11. Display the final context payload inside Studio for inspection.
-12. Make viewport width and height authoritative when preset labels and measured values disagree.
+10. [x] Add payload size limits and truncation rules.
+11. [x] Display context size, style count, and error count inside Studio.
+12. [x] Make viewport width and height authoritative when preset labels and measured values disagree.
 
 ### Required evidence
 
@@ -130,16 +137,18 @@ Create a safe file-editing layer before enabling a real autonomous agent.
 
 ### Tasks
 
-1. Capture a baseline for files before every request.
-2. Track files changed while the request is active.
-3. Detect developer changes that happen concurrently.
-4. Generate a unified diff for the transaction.
-5. Associate the transaction with session and selection IDs.
-6. Implement transaction-scoped undo.
-7. Prevent writes outside the approved project root.
-8. Detect scope expansion into shared or unrelated files.
-9. Store transaction state locally for recovery after a daemon restart.
-10. Add failure and partial-change handling.
+1. [x] Capture a baseline for deterministic mock patches.
+2. [x] Track the file changed while the mock request is active.
+3. [x] Detect developer changes before undo through content hashes.
+4. [x] Generate a unified diff for the transaction.
+5. [x] Associate the transaction with session and selection IDs.
+6. [x] Implement transaction-scoped undo.
+7. [x] Prevent lexical and symlink writes outside the approved project root.
+8. [x] Detect scope expansion into shared or unrelated files.
+9. [x] Store transaction state locally for recovery after a daemon restart.
+10. [x] Add failure and partial-change handling with compensating rollback.
+11. [x] Generalize the manager to atomic multi-file provider transactions.
+12. [x] Add explicit developer approval when a provider expands beyond the selected source scope.
 
 ### Proposed contract
 
@@ -149,11 +158,12 @@ type PatchTransaction = {
   sessionId: string;
   selectionId: string;
   instruction: string;
-  filesBefore: FileSnapshot[];
-  filesAfter: FileSnapshot[];
-  diff: string;
+  files: PatchFileChange[];
   scopeExpansion: string[];
-  status: "running" | "applied" | "reverted" | "failed";
+  status: "running" | "applied" | "reverted" | "conflicted" | "failed";
+  undoAvailable: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 ```
 
@@ -168,6 +178,8 @@ type PatchTransaction = {
 
 A mock editor can safely change files, show a diff, and undo its own work in a dirty repository.
 
+Stage 4 is implemented at source level and has direct Node runtime coverage for multi-file apply, durable restart loading, safe undo, scope approval, and concurrent-edit conflicts. Full workspace typecheck and browser validation remain part of Stage 1.
+
 ## Stage 5 - Integrate Codex managed sessions
 
 ### Objective
@@ -177,15 +189,15 @@ Replace the mock agent with a supported Codex integration while preserving the s
 ### Tasks
 
 1. Verify the official Codex surface for creating and continuing sessions.
-2. Determine how availability and authentication are detected.
-3. Implement `packages/provider-codex`.
-4. Create Codex sessions scoped to an approved project root.
+2. [x] Detect local CLI availability; provider authentication-state diagnostics remain open.
+3. [x] Implement the Codex adapter inside `packages/coding-provider`.
+4. [x] Scope Codex requests and file authorization to an approved project root.
 5. Store the provider session ID in the daemon registry.
 6. Stream agent status, assistant messages, tool activity, and changed files.
-7. Send structured selection context.
-8. Connect changed files to the active patch transaction.
-9. Support cancellation and provider cleanup.
-10. Handle authentication, unsupported configuration, and recoverable provider errors.
+7. [x] Send structured, bounded selection context and recent conversation history.
+8. [x] Connect exact provider replacements to the active patch transaction.
+9. [x] Support cancellation, timeout, temporary-output cleanup, and provider failures.
+10. Handle authentication setup and unsupported installed CLI versions.
 
 ### Context delivered to Codex
 
@@ -219,8 +231,8 @@ Close the loop between file edits and visible results.
 
 ### Tasks
 
-1. Monitor development-server availability.
-2. Detect HMR completion after a file change.
+1. [x] Check whether the active development-preview route remains reachable after a file change.
+2. Detect exact HMR completion after a file change.
 3. Wait for the selected component to render again.
 4. Capture new console and runtime errors.
 5. Capture the selected region after the change.
@@ -253,25 +265,26 @@ Allow Codex running outside PatchLens Studio to retrieve and use the current vis
 
 ### Tasks
 
-1. Implement `packages/mcp-server`.
+1. [x] Implement `packages/mcp-server`.
 2. Authenticate communication with the local daemon.
-3. Expose active-selection tools.
-4. Expose source-context and verification tools.
-5. Implement `patchlens connect codex`.
-6. Add a Codex skill or plugin describing the PatchLens workflow.
-7. Implement `patchlens disconnect codex`.
-8. Extend `patchlens doctor` with MCP diagnostics.
-9. Document the difference between managed and attached sessions.
+3. [x] Expose the active selection and bounded context as a tool and resource.
+4. [x] Expose transaction history as a read-only tool and resource; verification tools remain open.
+5. [x] Add the `patchlens mcp` stdio command.
+6. Implement `patchlens connect codex`.
+7. Add a Codex skill or plugin describing the PatchLens workflow.
+8. Implement `patchlens disconnect codex`.
+9. Extend `patchlens doctor` with MCP transport diagnostics.
+10. Document the difference between managed and attached sessions.
 
 ### Initial MCP tools
 
 ```text
-patchlens.get_active_selection
-patchlens.get_selection_context
-patchlens.get_source_context
-patchlens.get_console_errors
-patchlens.capture_preview
-patchlens.verify_visual_change
+patchlens_get_active_selection
+patchlens_list_transactions
+patchlens_get_source_context
+patchlens_get_console_errors
+patchlens://selection/current
+patchlens://transactions
 ```
 
 ### Required evidence
@@ -292,7 +305,7 @@ Prove that PatchLens is provider-independent and framework-extensible.
 
 ### Tasks
 
-1. Implement `packages/provider-claude`.
+1. [x] Implement the Claude Code CLI adapter in `packages/coding-provider`.
 2. Add Claude attached-session configuration.
 3. Add Next.js source instrumentation.
 4. Handle Server and Client Component boundaries.

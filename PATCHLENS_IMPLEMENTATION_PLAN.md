@@ -1,8 +1,26 @@
 # PatchLens AI - Technical architecture and implementation plan
 
-> Status: early implementation draft
+> Status: active source implementation
 >
 > Objective: let a developer select a visible region in a live web preview, attach a conversation to that selection, and allow Codex, Claude, or another coding agent to edit the corresponding source code safely.
+
+## Implementation checkpoint - 2026-08-09
+
+The current repository has completed the first safe end-to-end source slice:
+
+- React/Vite source instrumentation and a local source manifest.
+- Hover, click, and rectangle-drag selection with responsive viewport tracking.
+- Selection-anchored conversation UI for Desktop, Tablet, and Mobile previews.
+- Bounded context capture for sanitized DOM, computed styles, accessibility, and runtime errors.
+- Provider-independent mock, Codex CLI, and Claude Code CLI adapters.
+- Read-only provider execution that returns exact replacement proposals instead of writing files directly.
+- Atomic multi-file transactions with scope approval, path and symlink authorization, content hashes, compensating rollback, persistent history, restart recovery, unified diffs, and safe undo.
+- Studio transaction history, scope approval, request cancellation, diff review, and conflict reporting.
+- Active selection synchronization to the daemon.
+- A read-only MCP stdio bridge exposing the current selection and transaction history.
+- Loopback binding and explicit browser-origin restrictions.
+
+Direct Node runtime checks pass for provider parsing, prompt safety, multi-file apply, persistence, restart loading, undo, and concurrent-edit conflicts. Full workspace typecheck, Vite builds, and browser/HMR testing remain blocked until dependencies can be installed.
 
 ## 1. Product objective
 
@@ -57,6 +75,7 @@ The core technical problem is **visual-to-code grounding**. PatchLens must trans
 - **Explicit permissions:** project roots, providers, screenshots, and external bridges require clear authorization.
 - **Measured confidence:** ambiguous selections must be reported as ambiguous.
 - **Progressive support:** stabilize one framework and provider before expanding.
+- **Defensible workflow:** differentiate through grounding, transactions, verification, and provider portability rather than visual selection alone.
 
 ## 4. Target developer experience
 
@@ -97,12 +116,12 @@ flowchart TD
     Context --> Chat["Anchored Chat"]
     Chat --> Daemon["Local Daemon"]
     Daemon --> Sessions["Agent Session Registry"]
-    Sessions --> Provider{"Provider Adapter"}
-    Provider --> Codex["Codex"]
-    Provider --> Claude["Claude"]
-    Codex --> Repository["Repository Files"]
-    Claude --> Repository
-    Repository --> Transaction["Patch Transaction"]
+    Sessions --> Provider{"Read-only Provider Adapter"}
+    Provider --> Codex["Codex replacement proposal"]
+    Provider --> Claude["Claude replacement proposal"]
+    Codex --> Transaction["Patch Transaction"]
+    Claude --> Transaction
+    Transaction --> Repository["Repository Files"]
     Repository --> HMR["Development Server HMR"]
     HMR --> Verify["Visual and Runtime Verification"]
     Verify --> Chat
@@ -118,7 +137,8 @@ patchlens-ai/
 │
 ├── packages/
 │   ├── agent-protocol/          # Provider-independent contracts
-│   ├── cli/                     # init, doctor, connect, disconnect
+│   ├── cli/                     # init, doctor, and MCP stdio entry point
+│   ├── coding-provider/         # Mock, Codex CLI, and Claude CLI adapters
 │   ├── dev/                     # Public development dependency
 │   ├── inspector-runtime/       # Hover, click, drag, overlay
 │   ├── compiler-vite/           # React/Vite instrumentation
@@ -126,9 +146,7 @@ patchlens-ai/
 │   ├── selection-engine/        # Candidate ranking and confidence
 │   ├── source-mapper/           # Identifier and source-map resolution
 │   ├── context-builder/         # DOM, styles, screenshot, a11y, errors
-│   ├── mcp-server/              # External agent tools
-│   ├── provider-codex/          # Codex managed-session adapter
-│   ├── provider-claude/         # Claude managed-session adapter
+│   ├── mcp-server/              # Read-only external-agent context bridge
 │   ├── patch-transaction/       # Baselines, diffs, conflict detection, undo
 │   └── visual-verifier/         # HMR, screenshots, runtime checks
 │
@@ -411,13 +429,27 @@ type PatchTransaction = {
   sessionId: string;
   selectionId: string;
   instruction: string;
-  filesBefore: FileSnapshot[];
-  filesAfter: FileSnapshot[];
-  diff: string;
+  files: PatchFileChange[];
   scopeExpansion: string[];
-  status: "running" | "applied" | "reverted" | "failed";
+  status: "running" | "applied" | "reverted" | "conflicted" | "failed";
+  undoAvailable: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 ```
+
+The current source prototype implements a deterministic single-file vertical slice:
+
+1. Studio sends `text: New visible text` with the active selection.
+2. Daemon requires an exact project-relative source file and a direct-text candidate.
+3. `packages/patch-transaction` resolves the real path and rejects lexical or symlink escapes.
+4. The manager captures a SHA-256 baseline and requires one unambiguous text occurrence.
+5. The source file is written and verified against the expected after hash.
+6. Studio receives the transaction and displays its unified diff.
+7. Undo succeeds only if the current file still matches the transaction after hash.
+8. A newer developer edit changes the hash, marks the transaction conflicted, and prevents overwrite.
+
+This slice intentionally limits replacement text to one plain JSX-text line. It proves transaction ownership and undo safety without pretending the mock provider understands general natural language.
 
 Safety requirements:
 
@@ -736,5 +768,6 @@ DOM, styles, screenshots, and source excerpts need strict limits and prioritizat
 5. Fix any source-manifest, iframe-selection, or responsive synchronization issues found during verification.
 6. Add automated tests for Vite instrumentation and selection ranking.
 7. Extract context sanitization and ranking into dedicated packages.
-8. Implement a deterministic mock file editor through patch transactions.
-9. Begin the Codex managed-session integration spike only after transaction undo is proven.
+8. Extend the transaction manager from deterministic single-file patches to atomic multi-file provider runs.
+9. Persist transaction metadata and recovery state across daemon restarts.
+10. Begin the Codex managed-session integration spike after browser verification confirms diff and undo behavior.

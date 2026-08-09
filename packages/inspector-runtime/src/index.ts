@@ -3,6 +3,7 @@ import {
   type InspectorToStudioMessage,
   type Rectangle,
   type SelectedElement,
+  type SelectionContext,
   type SourceManifest,
   type SourceManifestEntry,
   type StudioToInspectorMessage,
@@ -36,12 +37,66 @@ type Candidate = {
 };
 
 const OVERLAY_ID = "patchlens-inspector-overlay";
+const INSPECTOR_INSTANCE_KEY = "__PATCHLENS_AI_INSPECTOR__";
+const SOURCE_MANIFEST_UPDATED_EVENT = "patchlens:source-manifest-updated";
 const DEFAULT_MANIFEST_URL = "/__patchlens/manifest";
 const DRAG_THRESHOLD = 7;
+const MAX_ELEMENT_HTML_CHARACTERS = 4000;
+const MAX_CONTEXT_HTML_CHARACTERS = 6000;
+const MAX_RUNTIME_ERRORS = 10;
+const MAX_RUNTIME_ERROR_CHARACTERS = 500;
+const COMPUTED_STYLE_PROPERTIES = [
+  "display",
+  "position",
+  "inset",
+  "z-index",
+  "box-sizing",
+  "width",
+  "height",
+  "min-width",
+  "max-width",
+  "min-height",
+  "max-height",
+  "margin",
+  "padding",
+  "gap",
+  "grid-template-columns",
+  "grid-template-rows",
+  "flex-direction",
+  "flex-wrap",
+  "align-items",
+  "justify-content",
+  "overflow",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "line-height",
+  "letter-spacing",
+  "text-align",
+  "color",
+  "background-color",
+  "border",
+  "border-radius",
+  "box-shadow",
+  "opacity",
+  "transform",
+] as const;
 
 export function installPatchLensInspector(
   options: InspectorOptions = {},
 ): InspectorController {
+  const globalWindow = window as Window & {
+    [INSPECTOR_INSTANCE_KEY]?: InspectorController;
+  };
+  const previousController = globalWindow[INSPECTOR_INSTANCE_KEY];
+  if (previousController && typeof previousController.destroy === "function") {
+    try {
+      previousController.destroy();
+    } catch {
+      delete globalWindow[INSPECTOR_INSTANCE_KEY];
+    }
+  }
+
   const existing = document.getElementById(OVERLAY_ID);
   existing?.remove();
 
@@ -102,14 +157,21 @@ export function installPatchLensInspector(
   let enabled = options.enabled ?? true;
   let pointerStart: Point | undefined;
   let pointerCurrent: Point | undefined;
+  let activePointerId: number | undefined;
   let activeElement: HTMLElement | undefined;
   let activeSelection: VisualSelection | undefined;
   let suppressNextClick = false;
   let frameRequest = 0;
   let manifestPromise: Promise<SourceManifest> | undefined;
+  let sourceRefreshPending = false;
+  const runtimeErrors: string[] = [];
+  let controller!: InspectorController;
 
-  const targetOrigin = options.studioOrigin ?? "*";
+  const trustedStudioOrigin = options.studioOrigin ?? readParentOrigin();
+  const targetOrigin = trustedStudioOrigin ?? "*";
   const manifestUrl = options.manifestUrl ?? DEFAULT_MANIFEST_URL;
+  const selectionResizeObserver = new ResizeObserver(() => scheduleSelectionRender());
+  const mutationObserver = new MutationObserver(() => scheduleSelectionRender());
 
   function send(message: InspectorToStudioMessage): void {
     if (window.parent !== window) {
@@ -135,7 +197,7 @@ export function installPatchLensInspector(
   }
 
   function handlePointerMove(event: PointerEvent): void {
-    if (!enabled) {
+    if (!enabled || (activePointerId !== undefined && event.pointerId !== activePointerId)) {
       return;
     }
 
@@ -170,6 +232,7 @@ export function installPatchLensInspector(
 
     pointerStart = { x: event.clientX, y: event.clientY };
     pointerCurrent = pointerStart;
+    activePointerId = event.pointerId;
     suppressNextClick = true;
     dragBox.style.display = "none";
     event.preventDefault();
@@ -177,7 +240,11 @@ export function installPatchLensInspector(
   }
 
   async function handlePointerUp(event: PointerEvent): Promise<void> {
-    if (!enabled || !pointerStart) {
+    if (
+      !enabled ||
+      !pointerStart ||
+      (activePointerId !== undefined && event.pointerId !== activePointerId)
+    ) {
       return;
     }
 
@@ -185,6 +252,7 @@ export function installPatchLensInspector(
     const start = pointerStart;
     pointerStart = undefined;
     pointerCurrent = undefined;
+    activePointerId = undefined;
     dragBox.style.display = "none";
     event.preventDefault();
     event.stopPropagation();
@@ -214,6 +282,14 @@ export function installPatchLensInspector(
     event.stopPropagation();
   }
 
+  function cancelPointerSelection(): void {
+    pointerStart = undefined;
+    pointerCurrent = undefined;
+    activePointerId = undefined;
+    suppressNextClick = false;
+    dragBox.style.display = "none";
+  }
+
   function handleKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape" && enabled) {
       clearSelection();
@@ -221,22 +297,44 @@ export function installPatchLensInspector(
   }
 
   function handleWindowMessage(event: MessageEvent<StudioToInspectorMessage>): void {
+    if (
+      event.source !== window.parent ||
+      (trustedStudioOrigin && event.origin !== trustedStudioOrigin)
+    ) {
+      return;
+    }
     const message = event.data;
     if (!message || message.source !== PATCHLENS_MESSAGE_SOURCE) {
       return;
     }
 
     if (message.type === "studio:set-inspector-mode") {
-      enabled = message.payload.enabled;
-      if (!enabled) {
-        hoverBox.style.display = "none";
-        dragBox.style.display = "none";
+      if (message.payload.enabled) {
+        enable();
+      } else {
+        disable();
       }
     }
 
     if (message.type === "studio:clear-selection") {
       clearSelection();
     }
+  }
+
+  function handleRuntimeError(event: ErrorEvent): void {
+    rememberRuntimeError(
+      runtimeErrors,
+      [event.message, event.filename, event.lineno ? `line ${event.lineno}` : ""]
+        .filter(Boolean)
+        .join(" at "),
+    );
+  }
+
+  function handleUnhandledRejection(event: PromiseRejectionEvent): void {
+    const reason = event.reason instanceof Error
+      ? `${event.reason.name}: ${event.reason.message}`
+      : String(event.reason ?? "Unhandled promise rejection");
+    rememberRuntimeError(runtimeErrors, reason);
   }
 
   async function selectElement(element: HTMLElement): Promise<void> {
@@ -247,6 +345,7 @@ export function installPatchLensInspector(
       [selected],
       selected,
       selected.rectangle,
+      "element",
     );
 
     publishSelection(selection, element);
@@ -280,7 +379,7 @@ export function installPatchLensInspector(
       return;
     }
 
-    const selection = createSelection(elements, primaryElement, rectangle);
+    const selection = createSelection(elements, primaryElement, rectangle, "region");
     publishSelection(selection, primaryCandidate.element);
   }
 
@@ -288,12 +387,14 @@ export function installPatchLensInspector(
     elements: SelectedElement[],
     primaryElement: SelectedElement,
     rectangle: Rectangle,
+    kind: VisualSelection["kind"],
   ): VisualSelection {
     const hasExactSource = Boolean(primaryElement.patchlensId && primaryElement.source);
     const hasAnySource = elements.some((element) => element.source);
 
     return {
       id: createSelectionId(),
+      kind,
       route: `${window.location.pathname}${window.location.search}`,
       viewport: readViewport(),
       rectangle,
@@ -310,6 +411,8 @@ export function installPatchLensInspector(
   ): void {
     activeElement = element;
     activeSelection = selection;
+    selectionResizeObserver.disconnect();
+    selectionResizeObserver.observe(element);
     hoverBox.style.display = "none";
     renderActiveSelection();
     options.onSelection?.(selection);
@@ -317,6 +420,11 @@ export function installPatchLensInspector(
       source: PATCHLENS_MESSAGE_SOURCE,
       type: "inspector:selection",
       payload: selection,
+    });
+    send({
+      source: PATCHLENS_MESSAGE_SOURCE,
+      type: "inspector:selection-context",
+      payload: buildSelectionContext(selection, element, runtimeErrors),
     });
   }
 
@@ -328,7 +436,9 @@ export function installPatchLensInspector(
       return;
     }
 
-    const rectangle = rectToRectangle(element.getBoundingClientRect());
+    const rectangle = activeSelection.kind === "region"
+      ? activeSelection.rectangle
+      : rectToRectangle(element.getBoundingClientRect());
     drawBox(selectionBox, rectangle);
 
     const source = activeSelection.primaryElement.source;
@@ -341,31 +451,50 @@ export function installPatchLensInspector(
   function scheduleSelectionRender(): void {
     window.cancelAnimationFrame(frameRequest);
     frameRequest = window.requestAnimationFrame(() => {
-      renderActiveSelection();
-
-      if (!activeElement || !activeElement.isConnected || !activeSelection) {
+      const currentElement = resolveActiveElement();
+      const currentSelection = activeSelection;
+      if (!currentElement || !currentElement.isConnected || !currentSelection) {
+        renderActiveSelection();
         return;
       }
 
-      const rectangle = rectToRectangle(activeElement.getBoundingClientRect());
+      const primaryRectangle = rectToRectangle(currentElement.getBoundingClientRect());
       const primaryElement = {
-        ...activeSelection.primaryElement,
-        rectangle,
+        ...currentSelection.primaryElement,
+        rectangle: primaryRectangle,
       };
-      activeSelection = {
-        ...activeSelection,
+      const elements = currentSelection.elements.map((element, index) => {
+        if (index === 0) {
+          return primaryElement;
+        }
+        const current = resolveSelectedElement(element);
+        return current
+          ? { ...element, rectangle: rectToRectangle(current.getBoundingClientRect()) }
+          : element;
+      });
+      const rectangle = currentSelection.kind === "region"
+        ? boundingRectangle(elements.map((element) => element.rectangle))
+          ?? currentSelection.rectangle
+        : primaryRectangle;
+      const nextSelection: VisualSelection = {
+        ...currentSelection,
         viewport: readViewport(),
         rectangle,
         primaryElement,
-        elements: activeSelection.elements.map((element, index) =>
-          index === 0 ? primaryElement : element,
-        ),
+        elements,
       };
-      options.onSelection?.(activeSelection);
+      activeSelection = nextSelection;
+      renderActiveSelection();
+      options.onSelection?.(nextSelection);
       send({
         source: PATCHLENS_MESSAGE_SOURCE,
         type: "inspector:selection",
-        payload: activeSelection,
+        payload: nextSelection,
+      });
+      send({
+        source: PATCHLENS_MESSAGE_SOURCE,
+        type: "inspector:selection-context",
+        payload: buildSelectionContext(nextSelection, currentElement, runtimeErrors),
       });
     });
   }
@@ -383,12 +512,70 @@ export function installPatchLensInspector(
     activeElement = Array.from(
       document.querySelectorAll<HTMLElement>("[data-patchlens-id]"),
     ).find((element) => element.dataset.patchlensId === patchlensId);
+    if (activeElement) {
+      selectionResizeObserver.disconnect();
+      selectionResizeObserver.observe(activeElement);
+      scheduleSourceManifestRefresh();
+    }
     return activeElement;
+  }
+
+  function resolveSelectedElement(element: SelectedElement): HTMLElement | undefined {
+    if (!element.patchlensId) {
+      return undefined;
+    }
+    return Array.from(
+      document.querySelectorAll<HTMLElement>("[data-patchlens-id]"),
+    ).find((candidate) => candidate.dataset.patchlensId === element.patchlensId);
+  }
+
+  function scheduleSourceManifestRefresh(): void {
+    if (sourceRefreshPending || !activeSelection) {
+      return;
+    }
+    sourceRefreshPending = true;
+    manifestPromise = undefined;
+    void loadManifest()
+      .then((manifest) => {
+        const currentSelection = activeSelection;
+        if (!currentSelection) {
+          return;
+        }
+        const elements = currentSelection.elements.map((element) => ({
+          ...element,
+          source: element.patchlensId
+            ? manifest[element.patchlensId] ?? element.source
+            : element.source,
+        }));
+        const primaryElement = {
+          ...currentSelection.primaryElement,
+          source: currentSelection.primaryElement.patchlensId
+            ? manifest[currentSelection.primaryElement.patchlensId]
+              ?? currentSelection.primaryElement.source
+            : currentSelection.primaryElement.source,
+        };
+        activeSelection = {
+          ...currentSelection,
+          primaryElement,
+          elements: elements.map((element, index) =>
+            index === 0 ? primaryElement : element,
+          ),
+        };
+        scheduleSelectionRender();
+      })
+      .finally(() => {
+        sourceRefreshPending = false;
+      });
+  }
+
+  function handleSourceManifestUpdated(): void {
+    scheduleSourceManifestRefresh();
   }
 
   function clearSelection(): void {
     activeElement = undefined;
     activeSelection = undefined;
+    selectionResizeObserver.disconnect();
     selectionBox.style.display = "none";
     label.style.display = "none";
     send({
@@ -403,8 +590,8 @@ export function installPatchLensInspector(
 
   function disable(): void {
     enabled = false;
+    cancelPointerSelection();
     hoverBox.style.display = "none";
-    dragBox.style.display = "none";
   }
 
   function destroy(): void {
@@ -412,22 +599,44 @@ export function installPatchLensInspector(
     window.removeEventListener("pointermove", handlePointerMove, true);
     window.removeEventListener("pointerdown", handlePointerDown, true);
     window.removeEventListener("pointerup", handlePointerUp, true);
+    window.removeEventListener("pointercancel", cancelPointerSelection, true);
     window.removeEventListener("click", handleClick, true);
     window.removeEventListener("keydown", handleKeyDown, true);
     window.removeEventListener("message", handleWindowMessage);
+    window.removeEventListener("error", handleRuntimeError);
+    window.removeEventListener("unhandledrejection", handleUnhandledRejection);
     window.removeEventListener("scroll", scheduleSelectionRender, true);
     window.removeEventListener("resize", scheduleSelectionRender);
+    window.removeEventListener("blur", cancelPointerSelection);
+    window.removeEventListener(SOURCE_MANIFEST_UPDATED_EVENT, handleSourceManifestUpdated);
+    selectionResizeObserver.disconnect();
+    mutationObserver.disconnect();
     overlayHost.remove();
+    if (globalWindow[INSPECTOR_INSTANCE_KEY] === controller) {
+      delete globalWindow[INSPECTOR_INSTANCE_KEY];
+    }
   }
 
   window.addEventListener("pointermove", handlePointerMove, true);
   window.addEventListener("pointerdown", handlePointerDown, true);
   window.addEventListener("pointerup", handlePointerUp, true);
+  window.addEventListener("pointercancel", cancelPointerSelection, true);
   window.addEventListener("click", handleClick, true);
   window.addEventListener("keydown", handleKeyDown, true);
   window.addEventListener("message", handleWindowMessage);
+  window.addEventListener("error", handleRuntimeError);
+  window.addEventListener("unhandledrejection", handleUnhandledRejection);
   window.addEventListener("scroll", scheduleSelectionRender, true);
   window.addEventListener("resize", scheduleSelectionRender);
+  window.addEventListener("blur", cancelPointerSelection);
+  window.addEventListener(SOURCE_MANIFEST_UPDATED_EVENT, handleSourceManifestUpdated);
+  mutationObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class", "hidden", "style"],
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
 
   send({
     source: PATCHLENS_MESSAGE_SOURCE,
@@ -437,13 +646,15 @@ export function installPatchLensInspector(
     },
   });
 
-  return {
+  controller = {
     enable,
     disable,
     clear: clearSelection,
     destroy,
     isEnabled: () => enabled,
   };
+  globalWindow[INSPECTOR_INSTANCE_KEY] = controller;
+  return controller;
 }
 
 function readViewport(): VisualSelection["viewport"] {
@@ -543,14 +754,30 @@ function toSelectedElement(
     patchlensId,
     tagName: element.tagName.toLowerCase(),
     text: collapseWhitespace(element.innerText).slice(0, 180),
-    html: sanitizeHtml(element),
+    directText: getDirectText(element),
+    html: sanitizeHtml(element, MAX_ELEMENT_HTML_CHARACTERS),
     rectangle: rectToRectangle(element.getBoundingClientRect()),
     source,
   };
 }
 
-function sanitizeHtml(element: HTMLElement): string {
+function getDirectText(element: HTMLElement): string {
+  const text = Array.from(element.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent ?? "")
+    .join(" ");
+
+  return collapseWhitespace(text).slice(0, 180);
+}
+
+function sanitizeHtml(element: HTMLElement, maxCharacters: number): string {
   const clone = element.cloneNode(true) as HTMLElement;
+
+  for (const unsafe of clone.querySelectorAll(
+    "script, style, noscript, iframe, object, embed",
+  )) {
+    unsafe.remove();
+  }
 
   if (clone instanceof HTMLInputElement) {
     clone.removeAttribute("value");
@@ -561,7 +788,7 @@ function sanitizeHtml(element: HTMLElement): string {
   }
 
   for (const attribute of [...clone.attributes]) {
-    if (/^(value|data-token|data-secret|data-password)$/i.test(attribute.name)) {
+    if (isSensitiveAttribute(attribute.name)) {
       clone.removeAttribute(attribute.name);
     }
   }
@@ -575,13 +802,153 @@ function sanitizeHtml(element: HTMLElement): string {
 
   for (const node of clone.querySelectorAll<HTMLElement>("*")) {
     for (const attribute of [...node.attributes]) {
-      if (/^(value|data-token|data-secret|data-password)$/i.test(attribute.name)) {
+      if (isSensitiveAttribute(attribute.name)) {
         node.removeAttribute(attribute.name);
       }
     }
   }
 
-  return clone.outerHTML.slice(0, 4000);
+  return clone.outerHTML.slice(0, maxCharacters);
+}
+
+function buildSelectionContext(
+  selection: VisualSelection,
+  element: HTMLElement,
+  runtimeErrors: string[],
+): SelectionContext {
+  const boundedHtml = sanitizeHtml(element, MAX_CONTEXT_HTML_CHARACTERS + 1);
+  const sanitizedHtml = boundedHtml.slice(0, MAX_CONTEXT_HTML_CHARACTERS);
+  const computedStyles = readComputedStyles(element);
+  const contextWithoutSize = {
+    selection,
+    sanitizedHtml,
+    computedStyles,
+    accessibilitySummary: buildAccessibilitySummary(element),
+    consoleErrors: runtimeErrors.slice(-MAX_RUNTIME_ERRORS),
+    capturedAt: new Date().toISOString(),
+    truncated: {
+      html: boundedHtml.length > MAX_CONTEXT_HTML_CHARACTERS,
+      styles: false,
+      consoleErrors: runtimeErrors.length > MAX_RUNTIME_ERRORS,
+    },
+  };
+
+  return {
+    ...contextWithoutSize,
+    approximateBytes: new TextEncoder().encode(JSON.stringify(contextWithoutSize)).byteLength,
+  };
+}
+
+function readComputedStyles(element: HTMLElement): Record<string, string> {
+  const styles = window.getComputedStyle(element);
+  return Object.fromEntries(
+    COMPUTED_STYLE_PROPERTIES.map((property) => [
+      property,
+      collapseWhitespace(styles.getPropertyValue(property)).slice(0, 240),
+    ]).filter((entry) => Boolean(entry[1])),
+  );
+}
+
+function buildAccessibilitySummary(element: HTMLElement): string {
+  const explicitRole = element.getAttribute("role");
+  const implicitRole = inferImplicitRole(element);
+  const name = readAccessibleName(element);
+  const states = [
+    element.hasAttribute("disabled") ? "disabled" : "",
+    formatAriaState(element, "aria-expanded"),
+    formatAriaState(element, "aria-selected"),
+    formatAriaState(element, "aria-checked"),
+    element.tabIndex >= 0 ? `tabindex=${element.tabIndex}` : "",
+  ].filter(Boolean);
+
+  return [
+    `role=${explicitRole ?? implicitRole ?? "generic"}`,
+    name ? `name=${JSON.stringify(name.slice(0, 240))}` : "name=unavailable",
+    states.length > 0 ? `state=${states.join(", ")}` : "",
+  ].filter(Boolean).join("; ");
+}
+
+function inferImplicitRole(element: HTMLElement): string | undefined {
+  if (element instanceof HTMLButtonElement) {
+    return "button";
+  }
+  if (element instanceof HTMLAnchorElement && element.hasAttribute("href")) {
+    return "link";
+  }
+  if (element instanceof HTMLInputElement) {
+    return element.type === "checkbox" ? "checkbox" : "textbox";
+  }
+  if (element instanceof HTMLSelectElement) {
+    return "combobox";
+  }
+  if (element instanceof HTMLTextAreaElement) {
+    return "textbox";
+  }
+  if (/^H[1-6]$/.test(element.tagName)) {
+    return "heading";
+  }
+  return undefined;
+}
+
+function readAccessibleName(element: HTMLElement): string {
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel) {
+    return collapseWhitespace(ariaLabel);
+  }
+
+  const labelledBy = element.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const value = labelledBy
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent ?? "")
+      .join(" ");
+    if (collapseWhitespace(value)) {
+      return collapseWhitespace(value);
+    }
+  }
+
+  if (element instanceof HTMLImageElement && element.alt) {
+    return collapseWhitespace(element.alt);
+  }
+  if (element instanceof HTMLInputElement && element.labels?.length) {
+    return collapseWhitespace(
+      Array.from(element.labels).map((label) => label.innerText).join(" "),
+    );
+  }
+
+  return collapseWhitespace(element.innerText || element.title || "");
+}
+
+function formatAriaState(element: HTMLElement, attribute: string): string {
+  const value = element.getAttribute(attribute);
+  return value === null ? "" : `${attribute.replace("aria-", "")}=${value}`;
+}
+
+function isSensitiveAttribute(name: string): boolean {
+  return /^(?:on.+|value|style|src|srcset|href|action|formaction|poster|xlink:href|srcdoc|nonce|data-(?:token|secret|password|api-key))$/i.test(
+    name,
+  );
+}
+
+function rememberRuntimeError(errors: string[], message: string): void {
+  const normalized = sanitizeRuntimeError(message).slice(0, MAX_RUNTIME_ERROR_CHARACTERS);
+  if (!normalized) {
+    return;
+  }
+  errors.push(normalized);
+  if (errors.length > MAX_RUNTIME_ERRORS * 2) {
+    errors.splice(0, errors.length - MAX_RUNTIME_ERRORS * 2);
+  }
+}
+
+function sanitizeRuntimeError(message: string): string {
+  return collapseWhitespace(message)
+    .replace(/\bBearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
+    .replace(/\b(?:sk|key)-[A-Za-z0-9_-]{12,}\b/g, "[redacted-key]")
+    .replace(/[A-Za-z]:\\[^\s]+/g, "[local path]")
+    .replace(/https?:\/\/[^\s?#]+(?:\?[^\s#]*)?(?:#[^\s]*)?/g, (url) =>
+      url.replace(/[?#].*$/, ""),
+    );
 }
 
 function rectangleFromPoints(start: Point, end: Point): Rectangle {
@@ -614,6 +981,25 @@ function intersectionArea(left: Rectangle, right: Rectangle): number {
   return width * height;
 }
 
+function boundingRectangle(rectangles: Rectangle[]): Rectangle | undefined {
+  const visible = rectangles.filter((rectangle) =>
+    rectangle.width > 0 && rectangle.height > 0
+  );
+  if (visible.length === 0) {
+    return undefined;
+  }
+  const left = Math.min(...visible.map((rectangle) => rectangle.x));
+  const top = Math.min(...visible.map((rectangle) => rectangle.y));
+  const right = Math.max(...visible.map((rectangle) => rectangle.x + rectangle.width));
+  const bottom = Math.max(...visible.map((rectangle) => rectangle.y + rectangle.height));
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
 function drawBox(element: HTMLElement, rectangle: Rectangle): void {
   element.style.display = "block";
   element.style.left = `${rectangle.x}px`;
@@ -639,4 +1025,15 @@ function createSelectionId(): string {
   }
 
   return `sel_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function readParentOrigin(): string | undefined {
+  if (window.parent === window || !document.referrer) {
+    return undefined;
+  }
+  try {
+    return new URL(document.referrer).origin;
+  } catch {
+    return undefined;
+  }
 }

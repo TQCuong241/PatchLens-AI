@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "files": ["dist"],
+  "exports": {
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4310 --strictPort",
     "build": "tsc --noEmit -p tsconfig.json && vite build",

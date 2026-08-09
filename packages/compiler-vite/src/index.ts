@@ -9,6 +9,8 @@ export type PatchLensViteOptions = {
   manifestPath?: string;
   include?: RegExp;
   exclude?: RegExp;
+  inspector?: boolean;
+  studioOrigin?: string;
 };
 
 type Insertion = {
@@ -19,6 +21,8 @@ type Insertion = {
 const DEFAULT_MANIFEST_PATH = "/__patchlens/manifest";
 const DEFAULT_INCLUDE = /\.[jt]sx$/;
 const DEFAULT_EXCLUDE = /(?:^|[/\\])node_modules(?:[/\\]|$)/;
+const VIRTUAL_INSPECTOR_ID = "virtual:patchlens-ai/inspector";
+const RESOLVED_VIRTUAL_INSPECTOR_ID = `\0${VIRTUAL_INSPECTOR_ID}`;
 
 export function patchLens(options: PatchLensViteOptions = {}): Plugin {
   const manifest = new Map<string, SourceManifestEntry>();
@@ -26,6 +30,7 @@ export function patchLens(options: PatchLensViteOptions = {}): Plugin {
   const manifestPath = options.manifestPath ?? DEFAULT_MANIFEST_PATH;
   const include = options.include ?? DEFAULT_INCLUDE;
   const exclude = options.exclude ?? DEFAULT_EXCLUDE;
+  const injectInspector = options.inspector ?? true;
   let config: ResolvedConfig;
 
   return {
@@ -37,7 +42,44 @@ export function patchLens(options: PatchLensViteOptions = {}): Plugin {
       config = resolvedConfig;
     },
 
+    resolveId(id) {
+      return id === VIRTUAL_INSPECTOR_ID ? RESOLVED_VIRTUAL_INSPECTOR_ID : null;
+    },
+
+    load(id) {
+      if (id !== RESOLVED_VIRTUAL_INSPECTOR_ID) {
+        return null;
+      }
+      const inspectorOptions = options.studioOrigin
+        ? `{ studioOrigin: ${JSON.stringify(options.studioOrigin)} }`
+        : "{}";
+      return [
+        'import { installPatchLensInspector } from "@patchlens-ai/inspector-runtime";',
+        `installPatchLensInspector(${inspectorOptions});`,
+        "if (import.meta.hot) {",
+        "  import.meta.hot.on('vite:afterUpdate', () => {",
+        "    window.dispatchEvent(new Event('patchlens:source-manifest-updated'));",
+        "  });",
+        "}",
+      ].join("\n");
+    },
+
+    transformIndexHtml() {
+      if (!injectInspector) {
+        return undefined;
+      }
+      return [{
+        tag: "script",
+        attrs: { type: "module" },
+        children: `import ${JSON.stringify(VIRTUAL_INSPECTOR_ID)};`,
+        injectTo: "body",
+      }];
+    },
+
     configureServer(server) {
+      server.watcher.on("unlink", (file) => {
+        replaceFileEntries(path.resolve(file), [], manifest, idsByFile);
+      });
       server.middlewares.use((request, response, next) => {
         const requestUrl = request.url?.split("?", 1)[0];
         if (requestUrl !== manifestPath) {
@@ -55,7 +97,7 @@ export function patchLens(options: PatchLensViteOptions = {}): Plugin {
 
     transform(code, id) {
       const cleanId = id.split("?", 1)[0] ?? id;
-      if (!include.test(cleanId) || exclude.test(cleanId)) {
+      if (!matches(include, cleanId) || matches(exclude, cleanId)) {
         return null;
       }
 
@@ -66,9 +108,18 @@ export function patchLens(options: PatchLensViteOptions = {}): Plugin {
         true,
         cleanId.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.JSX,
       );
-      const relativeFile = normalizePath(path.relative(config.root, cleanId));
+      const projectRelativeFile = path.relative(config.root, cleanId);
+      if (
+        projectRelativeFile === ".." ||
+        projectRelativeFile.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(projectRelativeFile)
+      ) {
+        return null;
+      }
+      const relativeFile = normalizePath(projectRelativeFile);
       const insertions: Insertion[] = [];
       const entries: SourceManifestEntry[] = [];
+      const elementOrdinals = new Map<string, number>();
 
       function visit(node: ts.Node): void {
         if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
@@ -85,8 +136,10 @@ export function patchLens(options: PatchLensViteOptions = {}): Plugin {
             const line = start.line + 1;
             const column = start.character + 1;
             const componentName = inferComponentName(node, sourceFile, cleanId);
+            const componentOrdinal = elementOrdinals.get(componentName) ?? 0;
+            elementOrdinals.set(componentName, componentOrdinal + 1);
             const patchlensId = createPatchLensId(
-              `${relativeFile}:${line}:${column}:${tagName}:${componentName}`,
+              `${relativeFile}:${componentName}:${componentOrdinal}:${tagName}`,
             );
 
             insertions.push({
@@ -192,4 +245,9 @@ function createPatchLensId(input: string): string {
 
 function normalizePath(value: string): string {
   return value.split(path.sep).join("/");
+}
+
+function matches(pattern: RegExp, value: string): boolean {
+  pattern.lastIndex = 0;
+  return pattern.test(value);
 }

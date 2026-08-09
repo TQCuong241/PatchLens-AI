@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@patchlens-ai/agent-protocol": "workspace:*",
+    "@patchlens-ai/inspector-runtime": "workspace:*",
     "typescript": "^5.9.2"
   },
   "peerDependencies": {

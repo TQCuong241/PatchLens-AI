@@ -61,17 +61,16 @@ The target installation experience is:
 ```bash
 npm install --save-dev @patchlens-ai/dev
 npx patchlens init
-npx patchlens connect codex
-npm run patchlens
+npx patchlens start
 ```
 
 > [!IMPORTANT]
-> These commands describe the intended developer experience. The repository is still in early development and the package has not been published.
+> The package is not published yet. The monorepo workflow below is the verified development path; the same `init` and `start` flow is being prepared for the first public package release.
 
 Once PatchLens Studio is running, the intended workflow is:
 
 1. Open the application inside a live development preview.
-2. Choose Desktop, Tablet, or Mobile and rotate Tablet/Mobile when needed.
+2. Choose Desktop, Tablet, Mobile, or enter a custom width and height; rotate Tablet/Mobile when needed.
 3. Enable selection mode.
 4. Hover to inspect the DOM element and source component under the pointer.
 5. Click a single element or drag across a group of elements.
@@ -109,10 +108,33 @@ The current Studio prototype provides:
 | Desktop | Fluid | — | Work with the available web workspace width. |
 | Tablet | `768 px` | `1024 px` | Inspect tablet breakpoints in portrait and landscape-style widths. |
 | Mobile | `390 px` | `844 px` | Inspect phone layouts in portrait and landscape-style widths. |
+| Custom | User-defined | User-defined | Reproduce a specific browser, screenshot, or breakpoint size. |
 
 When the preview width changes, the Inspector republishes the selected element rectangle and current iframe dimensions. Studio then repositions the anchored chat and sends the responsive preset, orientation, width, height, and device scale factor with the agent request. The selection ID remains stable, so changing viewport does not silently create a different conversation.
 
-The first prototype is a responsive-width preview, not a complete hardware emulator. Custom width and height fields, saved device presets, zoom/device scaling, touch and hover emulation, and side-by-side breakpoint comparison are planned after the core selection and patch-transaction flow is stable.
+The preview models CSS viewport dimensions. It does not emulate every physical-device feature such as browser chrome, user-agent differences, safe-area insets, touch hardware, or exact device pixel ratio.
+
+## Why PatchLens is different
+
+Visual selection alone is not the product moat. Public tools already explore element selection, source inspection, visual editing, and browser context for AI agents.
+
+PatchLens is designed around the complete trusted loop:
+
+- Select one element or drag across a visual region.
+- Resolve ranked source candidates with explicit confidence.
+- Keep a multi-turn conversation attached to the same visual intent.
+- Preserve desktop, tablet, mobile, and orientation context.
+- Connect managed Codex/Claude sessions or external agents through MCP.
+- Capture autonomous edits as reviewable patch transactions.
+- Detect concurrent developer changes before undo.
+- Verify HMR, runtime errors, and the visible result.
+- Keep the existing repository as the source of truth.
+
+Recommended positioning:
+
+> **PatchLens AI is the visual grounding and safe patch layer for any coding agent.**
+
+See [`docs/COMPETITIVE_LANDSCAPE.md`](./docs/COMPETITIVE_LANDSCAPE.md) for the competitive categories, product questions, and differentiation strategy.
 
 ## How visual-to-code mapping works
 
@@ -216,31 +238,32 @@ type AgentRequest = {
 
 ### Managed session
 
-PatchLens creates and owns the coding-agent session.
+PatchLens creates and owns the coding-agent request. Provider CLIs run in a read-only planning mode and return exact source replacements; only the PatchLens transaction layer may write files.
 
 ```text
 PatchLens Studio
-    → creates a Codex or Claude session
-    → stores the provider session ID
-    → sends every contextual message to the same session
-    → streams status, messages, file changes, and results back to Studio
+    → sends the active selection and bounded context to a provider adapter
+    → asks Codex or Claude to inspect the repository without modifying it
+    → parses exact project-relative replacements
+    → validates scope, paths, baselines, and concurrent edits
+    → applies one reviewable PatchLens transaction
 ```
 
-Managed sessions provide the most complete automatic experience because PatchLens knows exactly which project, selection, and agent session belong together.
+Conversation history is included in follow-up requests. Native provider-session resume and streaming remain adapter follow-up work because the supported CLI surface must be validated per installed provider version.
 
 ### Attached session through MCP
 
 The developer continues working in an external Codex or Claude interface. The external agent connects to the PatchLens MCP server and requests the active selection when needed.
 
-Planned MCP tools include:
+The current read-only MCP bridge exposes:
 
 ```text
-patchlens.get_active_selection
-patchlens.get_selection_context
-patchlens.get_source_context
-patchlens.capture_preview
-patchlens.get_console_errors
-patchlens.verify_visual_change
+patchlens_get_active_selection
+patchlens_list_transactions
+patchlens_get_source_context
+patchlens_get_console_errors
+patchlens://selection/current
+patchlens://transactions
 ```
 
 The developer can then tell the external agent:
@@ -261,11 +284,12 @@ flowchart TD
     Context --> Chat["Anchored Chat Overlay"]
     Chat --> Daemon["Local Daemon"]
     Daemon --> Registry["Agent Session Registry"]
-    Registry --> Adapter{"Provider Adapter"}
-    Adapter --> Codex["Codex"]
-    Adapter --> Claude["Claude"]
-    Codex --> Files["Repository Files"]
-    Claude --> Files
+    Registry --> Adapter{"Read-only Provider Adapter"}
+    Adapter --> Codex["Codex CLI proposal"]
+    Adapter --> Claude["Claude CLI proposal"]
+    Codex --> Transaction["Patch Transaction"]
+    Claude --> Transaction
+    Transaction --> Files["Repository Files"]
     Files --> HMR["Development Server HMR"]
     HMR --> Inspector
     Files --> Review["Diff, Verification, Undo"]
@@ -297,16 +321,15 @@ patchlens-ai/
 │
 ├── packages/
 │   ├── agent-protocol/          # Shared selection and agent contracts
-│   ├── cli/                     # init, doctor, connect, disconnect
+│   ├── cli/                     # init, doctor, and MCP bridge commands
+│   ├── coding-provider/         # Mock, Codex CLI, and Claude CLI adapters
 │   ├── dev/                     # Main package installed by developers
 │   ├── inspector-runtime/       # Hover, click, and drag selection
 │   ├── compiler-vite/           # React + Vite source instrumentation
 │   ├── selection-engine/        # Planned standalone selection ranking package
 │   ├── source-mapper/           # Planned source-resolution package
-│   ├── mcp-server/              # Planned MCP bridge for external agents
-│   ├── provider-codex/          # Planned Codex adapter
-│   ├── provider-claude/         # Planned Claude adapter
-│   ├── patch-transaction/       # Planned diff, checkpoint, and undo layer
+│   ├── mcp-server/              # Read-only MCP bridge for external agents
+│   ├── patch-transaction/       # Baselines, diff generation, conflict checks, safe undo
 │   └── visual-verifier/         # Planned visual and runtime verification
 │
 ├── examples/
@@ -323,25 +346,31 @@ The repository currently contains source-level implementations for:
 
 - A pnpm and TypeScript monorepo foundation.
 - `@patchlens-ai/agent-protocol` selection and agent contracts.
-- A Vite development plugin that injects `data-patchlens-id` metadata.
+- A Vite development plugin that injects stable `data-patchlens-id` metadata and auto-installs the Inspector runtime in the preview.
 - A local source-manifest endpoint.
-- An Inspector runtime with hover, click, and drag selection.
-- PatchLens Studio with a live preview, Desktop/Tablet/Mobile controls, orientation switching, a source context panel, and anchored chat.
+- An Inspector runtime with hover, click, drag-region selection, HMR rebinding, trusted parent messaging, and bounded context capture.
+- PatchLens Studio with a live preview, Desktop/Tablet/Mobile/Custom controls, orientation switching, a source context panel, and anchored chat.
 - Responsive selection updates that keep rectangle and viewport metadata synchronized after iframe resize.
-- A local daemon with health checks and mock-agent sessions.
+- A local daemon with health checks, browser-session authentication, bearer-token MCP authentication, and mock-agent sessions.
+- A bounded selection-context builder with sanitized DOM, computed styles, accessibility summary, and runtime errors.
+- A provider-independent bridge with deterministic mock, Codex CLI, and Claude Code CLI adapters.
+- Read-only provider execution: providers propose exact replacements and never own repository writes.
+- Atomic multi-file transactions with scope-expansion approval, project-root and symlink authorization, SHA-256 baselines, rollback, durable local history, restart recovery, unified diffs, and conflict-aware undo.
+- Active Diff, History, scope-policy, approval, cancellation, and Undo controls inside Studio.
+- A persisted post-patch verification record that checks preview reachability, HMR context refresh, component retention, source mapping, and new runtime errors when the Inspector reports back.
+- A read-only, authenticated MCP server that exposes the current Studio selection and transaction history.
+- Loopback binding and browser-origin restrictions for the local daemon.
 - A React + Vite application used as the visual-selection test surface.
-- CLI foundations for `patchlens init` and `patchlens doctor`.
+- CLI commands for `patchlens init`, `patchlens start`, `patchlens doctor`, and `patchlens mcp`.
 
-The following are not implemented yet:
+The following are not implemented yet or still require full environment verification:
 
-- A real Codex provider adapter.
-- A real Claude provider adapter.
-- Agent-owned file editing and patch transactions.
-- Safe undo for agent changes.
-- MCP attached-session support.
+- Production-build and browser end-to-end verification from a clean dependency install.
+- Native Codex/Claude session resume and event streaming.
+- Automatic provider authentication setup and configuration-file installation.
 - Screenshot-based visual verification.
 - Next.js instrumentation.
-- Custom viewport dimensions, device scaling, and side-by-side breakpoint comparison.
+- Device scaling, touch/hover emulation, and side-by-side breakpoint comparison.
 
 ## Running the prototype
 
@@ -360,6 +389,34 @@ Expected local services:
 | PatchLens Studio | `http://127.0.0.1:4310` |
 | Local daemon | `http://127.0.0.1:4311` |
 | React/Vite demo | `http://127.0.0.1:4312` |
+
+For a project that has already been built and initialized, the local launcher can run the configured preview, daemon, and production Studio shell together:
+
+```bash
+npx patchlens init
+npx patchlens start
+```
+
+Use `npx patchlens start --no-preview` when the application development server is already running. The launcher stores a short-lived daemon connection record in `.patchlens/daemon.json`; it is ignored by Git and is used by `patchlens mcp` and `patchlens doctor`.
+
+To exercise the first real edit transaction:
+
+1. Select an element whose visible text exists directly in its component source.
+2. Enter a deterministic instruction such as `text: Launch workspace`.
+3. Open **Diff** to review the unified patch.
+4. Use **Undo** before making another change to the same file.
+
+PatchLens refuses the undo if the file no longer matches the agent result. This protects developer edits made after the transaction.
+
+When `codex` or `claude` is available on the local command path, the daemon marks that provider available in Studio. The provider inspects the approved project in a read-only mode and returns JSON replacements. PatchLens then applies those replacements through the same transaction boundary used by the mock provider. Command names can be overridden with `PATCHLENS_CODEX_COMMAND` and `PATCHLENS_CLAUDE_COMMAND`.
+
+After the CLI is built or linked, external agents can start the attached read-only bridge with:
+
+```bash
+patchlens mcp
+```
+
+The MCP process reads the local daemon token, connects only to the loopback daemon, and exposes selection context and transaction history; it does not expose a tool that writes or undoes files. Managed Codex/Claude requests use the same authenticated daemon and transaction boundary.
 
 ## Full roadmap
 
@@ -403,10 +460,11 @@ Expected local services:
 - [x] Preserve a mock session across follow-up messages.
 - [x] Add Desktop, Tablet, and Mobile preview presets.
 - [x] Add portrait and landscape-style width switching for Tablet and Mobile.
+- [x] Add custom viewport width and height controls.
 - [x] Republish selection rectangles and viewport dimensions after responsive changes.
 - [ ] Persist selection threads in the daemon.
-- [ ] Capture sanitized DOM and computed styles.
-- [ ] Capture the accessibility summary.
+- [x] Capture sanitized DOM and computed styles.
+- [x] Capture the accessibility summary.
 - [ ] Capture selected-region screenshots.
 - [ ] Add custom width and height controls with saved device presets.
 - [ ] Add device scale, touch, hover, and reduced-motion emulation.
@@ -419,13 +477,16 @@ Expected local services:
 
 **Goal:** create a safe foundation before allowing an agent to modify files.
 
-- [ ] Capture file baselines before every agent request.
-- [ ] Track files changed while the agent is running.
-- [ ] Separate agent changes from concurrent developer changes.
-- [ ] Generate a unified diff for each transaction.
-- [ ] Implement transaction-scoped undo without destructive Git commands.
-- [ ] Detect scope expansion beyond the selected component.
-- [ ] Prevent accidental writes outside the approved project root.
+- [x] Capture file baselines before every deterministic mock patch.
+- [x] Track the file changed by the mock provider.
+- [x] Detect developer changes through before/after content hashes.
+- [x] Generate a unified diff for each applied transaction.
+- [x] Implement transaction-scoped undo without destructive Git commands.
+- [x] Reject lexical and symlink paths outside the approved project root.
+- [x] Expose transaction review and undo controls in Studio.
+- [x] Detect scope expansion beyond the selected component.
+- [x] Support atomic multi-file provider transactions with compensating rollback.
+- [x] Persist transaction state for daemon restart recovery.
 
 **Exit criteria:** a mock editor can change files, produce a reviewable diff, and undo only its own changes.
 
@@ -434,13 +495,13 @@ Expected local services:
 **Goal:** replace the mock agent with a supported Codex integration.
 
 - [ ] Confirm the official Codex integration surface for session creation and continuation.
-- [ ] Detect Codex availability and authentication state.
-- [ ] Implement the `provider-codex` adapter.
-- [ ] Create sessions scoped to the selected project root.
+- [x] Detect local Codex CLI availability.
+- [x] Implement a configurable read-only Codex CLI adapter.
+- [x] Scope provider requests and patch authorization to the selected project root.
 - [ ] Stream status, assistant messages, tool activity, and changed files.
-- [ ] Send structured selection context instead of an unstructured prompt dump.
-- [ ] Support cancellation, cleanup, and recoverable provider failures.
-- [ ] Connect Codex edits to patch transactions.
+- [x] Send structured and size-bounded selection context.
+- [x] Support request cancellation, cleanup, timeouts, and recoverable provider failures.
+- [x] Connect Codex replacement proposals to patch transactions.
 
 **Exit criteria:** a Studio chat request reaches Codex, modifies the intended component, and returns a reviewable transaction.
 
@@ -448,9 +509,10 @@ Expected local services:
 
 **Goal:** close the loop between agent edits and visible results.
 
-- [ ] Detect development-server and HMR state.
-- [ ] Wait for the selected component to render after a file change.
-- [ ] Collect new console and runtime errors.
+- [x] Detect whether the development preview route remains reachable after a patch.
+- [x] Wait for the selected component to report a post-HMR context snapshot.
+- [x] Collect new console and runtime errors when the Inspector reports back.
+- [ ] Detect exact HMR completion state from the framework's internal event stream.
 - [ ] Capture the selected region before and after the change.
 - [ ] Display before/after comparison inside Studio.
 - [ ] Verify the requested change at the active responsive viewport.
@@ -465,13 +527,13 @@ Expected local services:
 
 **Goal:** let Codex running outside Studio access the active PatchLens selection.
 
-- [ ] Implement the PatchLens MCP server.
-- [ ] Add authenticated communication between the MCP server and local daemon.
-- [ ] Expose active-selection and verification tools.
+- [x] Implement the PatchLens MCP server.
+- [x] Add authenticated communication between the MCP server and local daemon.
+- [x] Expose read-only active-selection and transaction-history tools/resources.
 - [ ] Implement `patchlens connect codex`.
 - [ ] Add a Codex skill or plugin that explains the PatchLens workflow.
 - [ ] Implement `patchlens disconnect codex`.
-- [ ] Extend `patchlens doctor` with MCP diagnostics.
+- [x] Extend `patchlens doctor` with daemon-token and protected-endpoint diagnostics.
 
 **Exit criteria:** an external Codex task can retrieve the current selection, edit the repository, and report the result back through PatchLens context.
 
@@ -479,7 +541,7 @@ Expected local services:
 
 **Goal:** prove that the architecture is provider-independent and framework-extensible.
 
-- [ ] Implement the Claude provider adapter.
+- [x] Implement a configurable read-only Claude Code CLI adapter.
 - [ ] Add Claude MCP installation and diagnostics.
 - [ ] Add Next.js source instrumentation.
 - [ ] Handle Server and Client Component boundaries.
@@ -557,7 +619,7 @@ Not universally. A web page cannot safely take control of an arbitrary external 
 
 ### Does the agent edit code automatically?
 
-That is the intended experience. However, automatic editing must run through patch transactions so the developer can inspect changed files, verify the result, and undo only the agent-owned changes.
+Yes, through a controlled boundary. The mock provider performs a deterministic `text: New visible text` replacement. The Codex and Claude adapters ask the local CLI to inspect the repository in read-only mode and return exact replacement proposals. PatchLens validates every path, scope expansion, source baseline, and replacement before it writes anything. CLI adapter execution still needs end-to-end verification against installed provider versions before a public release.
 
 ### Why not lock the agent to a single selected file?
 
@@ -565,7 +627,7 @@ The visible component may depend on shared CSS, a design token, a parent layout,
 
 ### How will undo work when the repository already has uncommitted changes?
 
-PatchLens should capture a transaction baseline, track only files changed by the agent, and generate a reverse operation for those exact changes. It must not reset the entire worktree or remove unrelated developer edits.
+The transaction engine captures every affected file exactly as it exists, including pre-existing uncommitted work. Undo restores those baselines only when all files still match the agent result. If the developer changes any file afterward, PatchLens marks the transaction conflicted and refuses to overwrite newer content. Transaction snapshots are stored locally for daemon-restart recovery and excluded from Git by default.
 
 ### Does PatchLens work on external websites?
 
@@ -581,7 +643,7 @@ React + Vite is the first target because it provides a focused environment for v
 
 ### Which coding agents will be supported first?
 
-Codex is the first managed-session target. Claude is planned after the provider-independent protocol and patch-transaction flow have been validated.
+The repository now contains provider-independent adapters for Codex CLI and Claude Code CLI, plus the deterministic mock provider. Codex remains the first adapter targeted for official compatibility verification, followed by Claude. External agents can also consume the current selection through the read-only MCP bridge.
 
 ### Can other agents integrate with PatchLens later?
 
@@ -603,6 +665,8 @@ No. The current repository is an early prototype. The intended package name and 
 
 - [`PATCHLENS_IMPLEMENTATION_PLAN.md`](./PATCHLENS_IMPLEMENTATION_PLAN.md) — detailed technical architecture and implementation plan.
 - [`docs/NEXT_STEPS.md`](./docs/NEXT_STEPS.md) — ordered execution plan from the current prototype to provider integrations.
+- [`docs/PROVIDER_INTEGRATION.md`](./docs/PROVIDER_INTEGRATION.md) — managed adapters, MCP attached mode, transaction boundaries, security, and provider Q&A.
+- [`docs/COMPETITIVE_LANDSCAPE.md`](./docs/COMPETITIVE_LANDSCAPE.md) — public reference categories, differentiation pillars, positioning, and product guardrails.
 
 ## Project status
 

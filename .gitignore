@@ -4,6 +4,11 @@ dist/
 .npm-cache/
 .vite/
 coverage/
+**/.patchlens/transactions.json
+**/.patchlens/daemon.json
+**/.patchlens/.transactions-*.tmp
+**/.patchlens/.daemon-*.tmp
+**/.patchlens-*.tmp
 *.log
 .DS_Store
 .env

@@ -1,5 +1,5 @@
 {
-  "name": "@patchlens-ai/cli",
+  "name": "@patchlens-ai/patch-transaction",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,17 +11,13 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "patchlens": "./dist/bin.js"
-  },
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm --filter @patchlens-ai/agent-protocol build && pnpm build && node --test dist/index.test.js"
   },
   "dependencies": {
-    "@patchlens-ai/daemon": "workspace:*",
-    "@patchlens-ai/mcp-server": "workspace:*",
-    "@patchlens-ai/studio": "workspace:*"
+    "@patchlens-ai/agent-protocol": "workspace:*"
   }
 }
