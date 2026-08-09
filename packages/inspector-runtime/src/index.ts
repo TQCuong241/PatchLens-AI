@@ -1,4 +1,5 @@
 import {
+  isStudioMessage,
   PATCHLENS_MESSAGE_SOURCE,
   type InspectorToStudioMessage,
   type Rectangle,
@@ -6,7 +7,6 @@ import {
   type SelectionContext,
   type SourceManifest,
   type SourceManifestEntry,
-  type StudioToInspectorMessage,
   type VisualSelection,
 } from "@patchlens-ai/agent-protocol";
 
@@ -167,14 +167,23 @@ export function installPatchLensInspector(
   const runtimeErrors: string[] = [];
   let controller!: InspectorController;
 
-  const trustedStudioOrigin = options.studioOrigin ?? readParentOrigin();
-  const targetOrigin = trustedStudioOrigin ?? "*";
+  const configuredStudioOrigin = normalizeOrigin(options.studioOrigin);
+  if (options.studioOrigin && !configuredStudioOrigin) {
+    throw new Error("PatchLens studioOrigin must be a valid HTTP(S) origin.");
+  }
+  const trustedStudioOrigin = configuredStudioOrigin ?? readParentOrigin();
+  const targetOrigin = trustedStudioOrigin;
   const manifestUrl = options.manifestUrl ?? DEFAULT_MANIFEST_URL;
-  const selectionResizeObserver = new ResizeObserver(() => scheduleSelectionRender());
-  const mutationObserver = new MutationObserver(() => scheduleSelectionRender());
+  // Older embedded previews may not expose observer APIs; selection still works without them.
+  const selectionResizeObserver = typeof ResizeObserver === "function"
+    ? new ResizeObserver(() => scheduleSelectionRender())
+    : undefined;
+  const mutationObserver = typeof MutationObserver === "function"
+    ? new MutationObserver(() => scheduleSelectionRender())
+    : undefined;
 
   function send(message: InspectorToStudioMessage): void {
-    if (window.parent !== window) {
+    if (window.parent !== window && targetOrigin) {
       window.parent.postMessage(message, targetOrigin);
     }
   }
@@ -296,17 +305,16 @@ export function installPatchLensInspector(
     }
   }
 
-  function handleWindowMessage(event: MessageEvent<StudioToInspectorMessage>): void {
+  function handleWindowMessage(event: MessageEvent<unknown>): void {
     if (
       event.source !== window.parent ||
-      (trustedStudioOrigin && event.origin !== trustedStudioOrigin)
+      !trustedStudioOrigin ||
+      event.origin !== trustedStudioOrigin ||
+      !isStudioMessage(event.data)
     ) {
       return;
     }
     const message = event.data;
-    if (!message || message.source !== PATCHLENS_MESSAGE_SOURCE) {
-      return;
-    }
 
     if (message.type === "studio:set-inspector-mode") {
       if (message.payload.enabled) {
@@ -411,8 +419,8 @@ export function installPatchLensInspector(
   ): void {
     activeElement = element;
     activeSelection = selection;
-    selectionResizeObserver.disconnect();
-    selectionResizeObserver.observe(element);
+    selectionResizeObserver?.disconnect();
+    selectionResizeObserver?.observe(element);
     hoverBox.style.display = "none";
     renderActiveSelection();
     options.onSelection?.(selection);
@@ -513,8 +521,8 @@ export function installPatchLensInspector(
       document.querySelectorAll<HTMLElement>("[data-patchlens-id]"),
     ).find((element) => element.dataset.patchlensId === patchlensId);
     if (activeElement) {
-      selectionResizeObserver.disconnect();
-      selectionResizeObserver.observe(activeElement);
+      selectionResizeObserver?.disconnect();
+      selectionResizeObserver?.observe(activeElement);
       scheduleSourceManifestRefresh();
     }
     return activeElement;
@@ -575,7 +583,7 @@ export function installPatchLensInspector(
   function clearSelection(): void {
     activeElement = undefined;
     activeSelection = undefined;
-    selectionResizeObserver.disconnect();
+    selectionResizeObserver?.disconnect();
     selectionBox.style.display = "none";
     label.style.display = "none";
     send({
@@ -609,8 +617,8 @@ export function installPatchLensInspector(
     window.removeEventListener("resize", scheduleSelectionRender);
     window.removeEventListener("blur", cancelPointerSelection);
     window.removeEventListener(SOURCE_MANIFEST_UPDATED_EVENT, handleSourceManifestUpdated);
-    selectionResizeObserver.disconnect();
-    mutationObserver.disconnect();
+    selectionResizeObserver?.disconnect();
+    mutationObserver?.disconnect();
     overlayHost.remove();
     if (globalWindow[INSPECTOR_INSTANCE_KEY] === controller) {
       delete globalWindow[INSPECTOR_INSTANCE_KEY];
@@ -630,7 +638,7 @@ export function installPatchLensInspector(
   window.addEventListener("resize", scheduleSelectionRender);
   window.addEventListener("blur", cancelPointerSelection);
   window.addEventListener(SOURCE_MANIFEST_UPDATED_EVENT, handleSourceManifestUpdated);
-  mutationObserver.observe(document.documentElement, {
+  mutationObserver?.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class", "hidden", "style"],
     childList: true,
@@ -833,9 +841,14 @@ function buildSelectionContext(
     },
   };
 
+  const serialized = JSON.stringify(contextWithoutSize);
+  const approximateBytes = typeof TextEncoder === "function"
+    ? new TextEncoder().encode(serialized).byteLength
+    : serialized.length;
+
   return {
     ...contextWithoutSize,
-    approximateBytes: new TextEncoder().encode(JSON.stringify(contextWithoutSize)).byteLength,
+    approximateBytes,
   };
 }
 
@@ -946,6 +959,7 @@ function sanitizeRuntimeError(message: string): string {
     .replace(/\bBearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
     .replace(/\b(?:sk|key)-[A-Za-z0-9_-]{12,}\b/g, "[redacted-key]")
     .replace(/[A-Za-z]:\\[^\s]+/g, "[local path]")
+    .replace(/(?:^|\s)\/(?:Users|home|private|var|tmp)\/[^\s]+/g, "$1[local path]")
     .replace(/https?:\/\/[^\s?#]+(?:\?[^\s#]*)?(?:#[^\s]*)?/g, (url) =>
       url.replace(/[?#].*$/, ""),
     );
@@ -1020,7 +1034,7 @@ function collapseWhitespace(value: string): string {
 }
 
 function createSelectionId(): string {
-  if (typeof crypto.randomUUID === "function") {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `sel_${crypto.randomUUID()}`;
   }
 
@@ -1028,11 +1042,34 @@ function createSelectionId(): string {
 }
 
 function readParentOrigin(): string | undefined {
-  if (window.parent === window || !document.referrer) {
+  if (window.parent === window) {
+    return undefined;
+  }
+
+  const ancestorOrigins = (window.location as Location & {
+    ancestorOrigins?: DOMStringList;
+  }).ancestorOrigins;
+  const ancestorOrigin = ancestorOrigins?.item(0);
+  if (ancestorOrigin) {
+    return normalizeOrigin(ancestorOrigin);
+  }
+
+  return normalizeOrigin(document.referrer);
+}
+
+function normalizeOrigin(value: string | undefined): string | undefined {
+  if (!value) {
     return undefined;
   }
   try {
-    return new URL(document.referrer).origin;
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return undefined;
+    }
+    if (url.username || url.password) {
+      return undefined;
+    }
+    return url.origin;
   } catch {
     return undefined;
   }

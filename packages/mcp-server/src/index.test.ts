@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { handlePatchLensMcpRequest } from "./index.js";
+import { handlePatchLensMcpRequest, resolveDaemonUrl } from "./index.js";
 
 test("lists read-only PatchLens MCP tools", async () => {
   const response = await handlePatchLensMcpRequest(
@@ -64,4 +64,20 @@ test("does not answer JSON-RPC notifications without an id", async () => {
     },
   );
   assert.equal(response, undefined);
+});
+
+test("only accepts a plain loopback daemon URL", () => {
+  assert.equal(resolveDaemonUrl("http://127.0.0.1:4311"), "http://127.0.0.1:4311");
+  assert.throws(
+    () => resolveDaemonUrl("https://127.0.0.1:4311"),
+    /loopback interface/,
+  );
+  assert.throws(
+    () => resolveDaemonUrl("http://127.0.0.1:4311/other"),
+    /loopback interface/,
+  );
+  assert.throws(
+    () => resolveDaemonUrl("http://user:pass@127.0.0.1:4311"),
+    /loopback interface/,
+  );
 });

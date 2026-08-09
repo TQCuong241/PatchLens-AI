@@ -18,6 +18,8 @@ Studio selection
 
 This separation is intentional. If Codex or Claude edits files directly, PatchLens cannot reliably distinguish agent-owned changes from pre-existing developer work, enforce scope expansion, or guarantee conflict-aware undo.
 
+The current prototype receives its project root from the launcher or daemon configuration and rejects lexical and symlink escapes from that boundary. A dedicated first-run screen for reviewing and explicitly approving that root is a release requirement and is not implemented yet.
+
 ## Managed provider mode
 
 Studio sends an `AgentRequest` to the local daemon. The request contains:
@@ -50,7 +52,7 @@ The provider must return JSON with exact replacements:
 
 PatchLens rejects a replacement when:
 
-- The path is absolute or resolves outside the approved project root.
+- The path is absolute or resolves outside the configured project root.
 - A symlink resolves outside the project root.
 - The file extension is not approved source or style text.
 - The source file is binary, invalid UTF-8, or too large.
@@ -61,7 +63,7 @@ PatchLens rejects a replacement when:
 
 ## Codex CLI adapter
 
-The daemon detects `codex` with a local version check. When selected, the adapter starts Codex without a shell, scopes it to the approved project root, requests a read-only sandbox, passes the structured PatchLens prompt through standard input, and reads the final JSON response from a temporary file.
+The daemon detects `codex` with a local version check. When selected, the adapter starts Codex without a shell, scopes it to the configured project root, requests a read-only sandbox, passes the structured PatchLens prompt through standard input, and reads the final JSON response from a temporary file.
 
 Default executable:
 
@@ -180,12 +182,13 @@ The intended configuration shape is conceptually similar to the following, but t
 - Browser calls are accepted only from configured Studio origins.
 - Provider processes start without `shell: true`.
 - Provider output, duration, prompt size, file size, and transaction size are bounded.
+- PatchLens daemon credentials and local connection hints are removed from the provider process environment.
 - Captured page content is labeled untrusted so DOM prompt injection cannot override the developer instruction.
 - Sensitive form values, inline event handlers, secret-like data attributes, scripts, iframes, and embedded objects are removed from captured HTML.
 - Absolute local paths are not returned in transaction errors.
 - PatchLens never uses `git reset --hard` for undo.
 
-Local authentication tokens between Studio, MCP, and daemon remain required before public distribution. Origin checks reduce browser exposure but are not a replacement for per-session authentication.
+The current prototype already authenticates Studio with a short-lived browser session cookie and MCP/CLI clients with a daemon bearer token. Origin checks reduce browser exposure, while the token boundary protects the daemon endpoints themselves. Token rotation, provider-specific credential diagnostics, and configuration installers still need release hardening.
 
 ## Questions and answers
 
@@ -219,6 +222,6 @@ No. The current probe confirms that a CLI can start and report a version. Authen
 - Verify Claude Code CLI arguments against supported versions.
 - Install dependencies and run strict typecheck/build from a clean checkout.
 - Add browser tests for selection, approval, patch, HMR, history, and undo.
-- Add per-session authentication between Studio, daemon, and MCP.
+- Add token rotation, provider-specific credential diagnostics, and configuration installers.
 - Add native provider streaming and session resume where officially supported.
 - Add live visual and runtime verification after every applied transaction.

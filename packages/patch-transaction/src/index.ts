@@ -131,7 +131,7 @@ export class PatchTransactionManager {
     if (!options.projectRoot) {
       throw new PatchTransactionError(
         "project_root_required",
-        "Patch transactions require an approved project root.",
+        "Patch transactions require a configured project root.",
       );
     }
     this.projectRoot = path.resolve(options.projectRoot);
@@ -694,7 +694,7 @@ export class PatchTransactionManager {
     } catch {
       throw new PatchTransactionError(
         "project_root_unavailable",
-        "The approved project root could not be resolved.",
+        "The configured project root could not be resolved.",
       );
     }
 
@@ -704,7 +704,7 @@ export class PatchTransactionManager {
     } catch {
       throw new PatchTransactionError(
         "source_file_unavailable",
-        `${relativeFile} could not be resolved inside the approved project root.`,
+        `${relativeFile} could not be resolved inside the configured project root.`,
       );
     }
     assertPathInside(
@@ -860,8 +860,9 @@ export class PatchTransactionManager {
         ) {
           throw error;
         }
-        await writeFile(this.stateFile, serialized, { encoding: "utf8", mode: 0o600 });
-        await rm(temporaryFile, { force: true });
+        // Replace the directory entry instead of following an existing state-file symlink.
+        await rm(this.stateFile, { force: true });
+        await rename(temporaryFile, this.stateFile);
       }
     } catch {
       await rm(temporaryFile, { force: true }).catch(() => undefined);
@@ -984,21 +985,83 @@ export function createUnifiedDiff(
 }
 
 function validateApplyInput(input: ApplyTextReplacementsInput): void {
-  if (!input.sessionId || !input.selectionId || !input.instruction.trim()) {
+  if (
+    !input ||
+    typeof input.sessionId !== "string" ||
+    typeof input.selectionId !== "string" ||
+    typeof input.instruction !== "string" ||
+    !input.sessionId.trim() ||
+    !input.selectionId.trim() ||
+    !input.instruction.trim() ||
+    input.sessionId.length > 240 ||
+    input.selectionId.length > 240 ||
+    input.instruction.length > 20_000
+  ) {
     throw new PatchTransactionError(
       "invalid_transaction_input",
       "A session, selection, and developer instruction are required.",
     );
   }
-  if (input.changes.length === 0 || input.changes.length > 64) {
+  if (!Array.isArray(input.changes) || input.changes.length === 0 || input.changes.length > 64) {
     throw new PatchTransactionError(
       "invalid_transaction_input",
       "A patch transaction requires between 1 and 64 exact replacements.",
     );
   }
+  if (
+    input.scopePolicy !== undefined &&
+    !["prefer-selection", "strict", "allow-related"].includes(input.scopePolicy)
+  ) {
+    throw new PatchTransactionError(
+      "invalid_transaction_input",
+      "The patch transaction scope policy is invalid.",
+    );
+  }
+  validateScopeFiles(input.selectedFiles, "selected source scope");
+  validateScopeFiles(input.approvedScopeExpansion, "approved scope expansion");
+}
+
+function validateScopeFiles(value: string[] | undefined, label: string): void {
+  if (value === undefined) {
+    return;
+  }
+  if (
+    !Array.isArray(value) ||
+    value.length > 64 ||
+    value.some((file) => {
+      if (typeof file !== "string" || !file || file.length > 1_000 || file.includes("\0")) {
+        return true;
+      }
+      const normalized = file.replace(/\\/g, "/");
+      return path.isAbsolute(file) || normalized.split("/").includes("..");
+    })
+  ) {
+    throw new PatchTransactionError(
+      "invalid_transaction_input",
+      `The ${label} contains an invalid project-relative file path.`,
+    );
+  }
 }
 
 function validateReplacement(change: TextReplacementChange): void {
+  if (
+    !change ||
+    typeof change.file !== "string" ||
+    typeof change.expectedText !== "string" ||
+    typeof change.replacementText !== "string" ||
+    !change.file.trim()
+  ) {
+    throw new PatchTransactionError(
+      "invalid_replacement",
+      "Every replacement requires a project-relative file and text values.",
+    );
+  }
+  if (change.file.length > 1_000 || change.file.includes("\0")) {
+    throw new PatchTransactionError(
+      "invalid_project_path",
+      "The replacement file path is invalid or too long.",
+    );
+  }
   if (!change.expectedText) {
     throw new PatchTransactionError(
       "missing_expected_text",
@@ -1303,7 +1366,7 @@ function assertPathInside(
   if (outside || (!allowSame && !relative)) {
     throw new PatchTransactionError(
       code,
-      `${displayPath} resolves outside the approved project root.`,
+      `${displayPath} resolves outside the configured project root.`,
     );
   }
 }

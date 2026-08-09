@@ -4,29 +4,32 @@
 >
 > Objective: let a developer select a visible region in a live web preview, attach a conversation to that selection, and allow Codex, Claude, or another coding agent to edit the corresponding source code safely.
 
-## Implementation checkpoint - 2026-08-09
+## Implementation checkpoint - 2026-08-10
 
 The current repository has completed the first safe end-to-end source slice:
 
 - React/Vite source instrumentation and a local source manifest.
 - Hover, click, and rectangle-drag selection with responsive viewport tracking.
 - Selection-anchored conversation UI for Desktop, Tablet, and Mobile previews.
+- Custom viewport width and height controls with responsive selection rebinding.
 - Bounded context capture for sanitized DOM, computed styles, accessibility, and runtime errors.
 - Provider-independent mock, Codex CLI, and Claude Code CLI adapters.
 - Read-only provider execution that returns exact replacement proposals instead of writing files directly.
-- Atomic multi-file transactions with scope approval, path and symlink authorization, content hashes, compensating rollback, persistent history, restart recovery, unified diffs, and safe undo.
-- Studio transaction history, scope approval, request cancellation, diff review, and conflict reporting.
+- Atomic multi-file transactions with related-file scope approval, configured-root confinement, symlink target checks, content hashes, compensating rollback, persistent history, restart recovery, unified diffs, and safe undo.
+- Studio transaction history, related-file scope approval, request cancellation, diff review, and conflict reporting.
 - Active selection synchronization to the daemon.
 - A read-only MCP stdio bridge exposing the current selection and transaction history.
-- Loopback binding and explicit browser-origin restrictions.
+- Loopback binding, explicit browser-origin restrictions, and browser/bearer authentication.
+- A `patchlens start` launcher that can run the preview, daemon, and production Studio shell together.
+- Runtime protocol guards that reject malformed messages from an untrusted preview frame.
 
-Direct Node runtime checks pass for provider parsing, prompt safety, multi-file apply, persistence, restart loading, undo, and concurrent-edit conflicts. Full workspace typecheck, Vite builds, and browser/HMR testing remain blocked until dependencies can be installed.
+Thirty-one direct Node runtime tests pass for protocol validation, CLI behavior, provider parsing and prompt safety, MCP requests, transaction input validation, multi-file apply, persistence, restart loading, undo, and concurrent-edit conflicts. Full workspace typecheck, Vite builds, and browser/HMR testing remain blocked until dependencies can be installed.
 
 ## 1. Product objective
 
 PatchLens AI is a development tool installed into an existing Node.js web project. It should provide a live preview where a developer can:
 
-1. Switch between desktop, tablet, mobile, and later custom responsive viewports.
+1. Switch between desktop, tablet, mobile, or a custom responsive viewport.
 2. Hover, click, or drag to select part of the interface.
 3. Resolve the selected DOM region to component and source candidates.
 4. Open a chat beside the selected region.
@@ -47,6 +50,7 @@ The core technical problem is **visual-to-code grounding**. PatchLens must trans
 - Development-time JSX and TSX instrumentation.
 - Click and rectangle-drag selection.
 - Desktop, tablet, and mobile responsive preview modes.
+- Custom viewport width and height controls.
 - Responsive viewport metadata included in agent context.
 - Component, file, line, and column candidates.
 - Chat attached to a selection.
@@ -344,8 +348,8 @@ Suggested communication:
 
 - HTTP for health, configuration, and short requests.
 - Server-Sent Events or WebSocket for provider streaming.
-- Local session token for Studio authentication.
-- Separate authenticated channel for MCP.
+- Short-lived browser session cookie for Studio authentication.
+- Bearer-token channel for MCP and CLI clients.
 
 ### 7.8. Agent Session Registry
 
@@ -373,16 +377,13 @@ Studio and daemon should depend on one provider-independent interface.
 
 ```ts
 export interface CodingProvider {
-  id: string;
-  detect(): Promise<ProviderStatus>;
-  createSession(input: CreateSessionInput): Promise<AgentSessionHandle>;
-  sendMessage(
-    session: AgentSessionHandle,
-    request: AgentRequest
-  ): AsyncIterable<AgentEvent>;
-  cancel(session: AgentSessionHandle): Promise<void>;
-  dispose(session: AgentSessionHandle): Promise<void>;
+  readonly id: string;
+  readonly label: string;
+  probe(): Promise<ProviderAvailability>;
+  run(input: CodingProviderRequest): Promise<CodingProviderResult>;
 }
+
+The current source implementation uses this bounded request/response contract. Native session creation, event streaming, and provider-specific resume can be layered on later without changing the visual selection protocol.
 ```
 
 Provider adapters own:
@@ -403,17 +404,17 @@ MCP enables explicitly configured external coding agents to retrieve PatchLens c
 Initial tool surface:
 
 ```text
-patchlens.get_active_selection
-patchlens.get_selection_context
-patchlens.get_source_context
-patchlens.get_console_errors
-patchlens.capture_preview
-patchlens.verify_visual_change
+patchlens_get_active_selection
+patchlens_get_source_context
+patchlens_get_console_errors
+patchlens_list_transactions
 ```
+
+The current bridge also exposes `patchlens://selection/current` and `patchlens://transactions` as read-only resources. Screenshot capture and visual-verification tools remain future capabilities.
 
 Requirements:
 
-- Authenticate with the daemon.
+- Authenticate with the daemon using the local bearer token.
 - Restrict all source access to the approved project root.
 - Keep tool responses bounded.
 - Avoid embedding secrets in configuration.
@@ -619,9 +620,10 @@ Verification
 
 ## 11. Security and privacy
 
-- Bind the daemon to localhost by default.
-- Require a local authentication token for Studio and MCP clients.
-- Require explicit project-root approval.
+- Bind the daemon to `127.0.0.1` by default.
+- Use a short-lived browser session cookie for Studio and a local bearer token for MCP/CLI clients.
+- Treat the launcher/configuration root as the enforced boundary in the current prototype.
+- Require an explicit first-run project-root review and approval flow before public release.
 - Reject resolved paths outside the approved root.
 - Remove secret-like DOM attributes and form values.
 - Limit screenshot capture to requested regions whenever possible.
@@ -708,6 +710,7 @@ The first usable MVP is complete when:
 - A React + Vite repository can install PatchLens through a documented command flow.
 - Studio displays a live local preview.
 - Studio can target desktop, tablet, and mobile responsive widths without losing the active selection.
+- Studio can target a custom width and height while preserving the active selection.
 - Click and drag selections produce useful source candidates.
 - The selection thread keeps its visual context across follow-up messages.
 - Codex receives structured visual and source context.
@@ -717,6 +720,8 @@ The first usable MVP is complete when:
 - PatchLens reports runtime failures and changed files.
 - Undo restores only agent-owned changes.
 - Production builds contain no PatchLens instrumentation.
+
+The source-level prototype now covers the local mock and read-only CLI proposal paths. The MVP is not release-ready until dependencies can be installed, strict typecheck/build passes, and a browser run verifies selection, HMR, diff, verification, and undo.
 
 ## 16. Main technical risks
 
@@ -762,12 +767,12 @@ DOM, styles, screenshots, and source excerpts need strict limits and prioritizat
 ## 18. Immediate engineering tasks
 
 1. Install dependencies in a network-enabled environment.
-2. Run typecheck and build across all workspace packages.
-3. Start Studio, daemon, and demo.
-4. Verify Desktop, Tablet, Mobile, rotation, and anchored-chat behavior in the first browser run.
+2. Run strict typecheck and production builds across all workspace packages.
+3. Start the preview, daemon, and Studio through `patchlens start`.
+4. Verify Desktop, Tablet, Mobile, Custom, rotation, and anchored-chat behavior in the first browser run.
 5. Fix any source-manifest, iframe-selection, or responsive synchronization issues found during verification.
-6. Add automated tests for Vite instrumentation and selection ranking.
-7. Extract context sanitization and ranking into dedicated packages.
-8. Extend the transaction manager from deterministic single-file patches to atomic multi-file provider runs.
-9. Persist transaction metadata and recovery state across daemon restarts.
-10. Begin the Codex managed-session integration spike after browser verification confirms diff and undo behavior.
+6. Add browser fixtures for Vite instrumentation, selection ranking, HMR, and undo.
+7. Verify Codex and Claude CLI argument templates against supported installed versions.
+8. Add native provider streaming/resume only after the CLI compatibility matrix is known.
+9. Implement safe provider configuration installers with backup, merge, and uninstall tests.
+10. Add screenshot capture and before/after visual verification.

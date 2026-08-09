@@ -90,7 +90,6 @@ export function patchLens(options: PatchLensViteOptions = {}): Plugin {
         response.statusCode = 200;
         response.setHeader("Content-Type", "application/json; charset=utf-8");
         response.setHeader("Cache-Control", "no-store");
-        response.setHeader("Access-Control-Allow-Origin", "*");
         response.end(JSON.stringify(Object.fromEntries(manifest), null, 2));
       });
     },
@@ -192,7 +191,8 @@ function replaceFileEntries(
   manifest: Map<string, SourceManifestEntry>,
   idsByFile: Map<string, string[]>,
 ): void {
-  for (const previousId of idsByFile.get(file) ?? []) {
+  const fileKey = normalizeFileKey(file);
+  for (const previousId of idsByFile.get(fileKey) ?? []) {
     manifest.delete(previousId);
   }
 
@@ -202,7 +202,7 @@ function replaceFileEntries(
     nextIds.push(entry.id);
   }
 
-  idsByFile.set(file, nextIds);
+  idsByFile.set(fileKey, nextIds);
 }
 
 function inferComponentName(
@@ -245,6 +245,10 @@ function createPatchLensId(input: string): string {
 
 function normalizePath(value: string): string {
   return value.split(path.sep).join("/");
+}
+
+function normalizeFileKey(value: string): string {
+  return path.normalize(path.resolve(value));
 }
 
 function matches(pattern: RegExp, value: string): boolean {

@@ -178,7 +178,7 @@ export class CodexCliProvider implements CodingProvider {
       const output = await readFile(outputFile, "utf8").catch(() => execution.stdout);
       return parseProviderResponse(output, "Codex");
     } finally {
-      await rm(temporaryDirectory, { recursive: true, force: true });
+      await rm(temporaryDirectory, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 }
@@ -366,6 +366,19 @@ export function parseProviderResponse(
     const file = value.file;
     const expectedText = value.expectedText;
     const replacementText = value.replacementText;
+    if (
+      path.isAbsolute(file) ||
+      file.includes("\0") ||
+      file === "." ||
+      file.startsWith("../") ||
+      file.startsWith("..\\") ||
+      file.length > 1_000
+    ) {
+      throw new CodingProviderError(
+        "provider_response_invalid",
+        `${providerLabel} replacement ${index + 1} must use a project-relative file path.`,
+      );
+    }
     if (
       expectedText.length > 200_000 ||
       replacementText.length > 200_000
@@ -621,7 +634,7 @@ async function runCli(options: {
   return new Promise((resolve, reject) => {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
-      env: process.env,
+      env: providerEnvironment(),
       shell: false,
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
@@ -696,6 +709,22 @@ async function runCli(options: {
     options.signal?.addEventListener("abort", abort, { once: true });
     child.stdin?.end(options.stdin, "utf8");
   });
+}
+
+function providerEnvironment(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  // Do not pass PatchLens's daemon credential or local connection hints to an agent CLI.
+  for (const key of [
+    "PATCHLENS_AUTH_TOKEN",
+    "PATCHLENS_DAEMON_URL",
+    "PATCHLENS_PROJECT_ROOT",
+    "PATCHLENS_DAEMON_PORT",
+    "PATCHLENS_STUDIO_PORT",
+    "PATCHLENS_STUDIO_ORIGINS",
+  ]) {
+    delete environment[key];
+  }
+  return environment;
 }
 
 function cliFailure(providerLabel: string, execution: CliExecutionResult): CodingProviderError {

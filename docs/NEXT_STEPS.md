@@ -20,11 +20,11 @@ The repository currently contains:
 - A bounded context builder for sanitized DOM, computed styles, accessibility, viewport state, and runtime errors.
 - A provider-independent bridge with mock, Codex CLI, and Claude Code CLI adapters.
 - Read-only provider proposal mode followed by PatchLens-owned exact replacements.
-- Atomic multi-file transactions, explicit scope expansion, compensating rollback, durable JSON history, restart recovery, unified diffs, and conflict-aware undo.
-- Diff, History, scope approval, and safe undo surfaces in Studio.
+- Atomic multi-file transactions, explicit related-file scope expansion, compensating rollback, durable JSON history, restart recovery, unified diffs, and conflict-aware undo.
+- Diff, History, related-file scope approval, and safe undo surfaces in Studio.
 - A read-only MCP server and `patchlens mcp` command for external agents.
 - A React/Vite demo application.
-- CLI foundations for `patchlens init` and `patchlens doctor`.
+- CLI commands for `patchlens init`, `patchlens start`, `patchlens doctor`, and `patchlens mcp`, including local daemon-token handling.
 
 Dependency installation and full build verification still need to run in an environment with npm registry access:
 
@@ -33,6 +33,8 @@ pnpm install
 pnpm build
 pnpm dev
 ```
+
+Thirty-one direct Node tests currently cover both iframe protocol guards, CLI initialization/help/static-server/proxy paths, provider prompt and response handling, MCP JSON-RPC behavior, and patch-transaction input validation/apply/rollback/recovery. They do not replace a real TypeScript build or browser run.
 
 ## Stage 1 - Verify the current vertical slice
 
@@ -143,7 +145,7 @@ Create a safe file-editing layer before enabling a real autonomous agent.
 4. [x] Generate a unified diff for the transaction.
 5. [x] Associate the transaction with session and selection IDs.
 6. [x] Implement transaction-scoped undo.
-7. [x] Prevent lexical and symlink writes outside the approved project root.
+7. [x] Prevent lexical and symlink writes outside the configured project root.
 8. [x] Detect scope expansion into shared or unrelated files.
 9. [x] Store transaction state locally for recovery after a daemon restart.
 10. [x] Add failure and partial-change handling with compensating rollback.
@@ -178,7 +180,7 @@ type PatchTransaction = {
 
 A mock editor can safely change files, show a diff, and undo its own work in a dirty repository.
 
-Stage 4 is implemented at source level and has direct Node runtime coverage for multi-file apply, durable restart loading, safe undo, scope approval, and concurrent-edit conflicts. Full workspace typecheck and browser validation remain part of Stage 1.
+Stage 4 is implemented at source level and has direct Node runtime coverage for multi-file apply, durable restart loading, safe undo, related-file scope approval, and concurrent-edit conflicts. Full workspace typecheck and browser validation remain part of Stage 1.
 
 ## Stage 5 - Integrate Codex managed sessions
 
@@ -191,8 +193,8 @@ Replace the mock agent with a supported Codex integration while preserving the s
 1. Verify the official Codex surface for creating and continuing sessions.
 2. [x] Detect local CLI availability; provider authentication-state diagnostics remain open.
 3. [x] Implement the Codex adapter inside `packages/coding-provider`.
-4. [x] Scope Codex requests and file authorization to an approved project root.
-5. Store the provider session ID in the daemon registry.
+4. [x] Scope Codex requests and file authorization to the configured project root; a dedicated first-run root-approval screen remains open.
+5. [x] Store the provider session ID in the daemon registry (native session resume remains open).
 6. Stream agent status, assistant messages, tool activity, and changed files.
 7. [x] Send structured, bounded selection context and recent conversation history.
 8. [x] Connect exact provider replacements to the active patch transaction.
@@ -243,7 +245,8 @@ Close the loop between file edits and visible results.
 10. Keep the same selection thread active after verification.
 11. Verify the active responsive viewport before running broader regression captures.
 12. Add optional Desktop/Tablet/Mobile comparison captures.
-13. Add custom width and height controls with saved project-level device presets.
+13. [x] Add custom width and height controls.
+14. Add saved project-level device presets for custom dimensions.
 14. Evaluate zoom, touch/hover capability, reduced-motion, safe-area, and device-scale emulation.
 
 ### Required evidence
@@ -266,14 +269,14 @@ Allow Codex running outside PatchLens Studio to retrieve and use the current vis
 ### Tasks
 
 1. [x] Implement `packages/mcp-server`.
-2. Authenticate communication with the local daemon.
+2. [x] Authenticate communication with the local daemon.
 3. [x] Expose the active selection and bounded context as a tool and resource.
 4. [x] Expose transaction history as a read-only tool and resource; verification tools remain open.
 5. [x] Add the `patchlens mcp` stdio command.
 6. Implement `patchlens connect codex`.
 7. Add a Codex skill or plugin describing the PatchLens workflow.
 8. Implement `patchlens disconnect codex`.
-9. Extend `patchlens doctor` with MCP transport diagnostics.
+9. [x] Extend `patchlens doctor` with daemon-token and protected-endpoint diagnostics; richer MCP transport checks remain open.
 10. Document the difference between managed and attached sessions.
 
 ### Initial MCP tools
@@ -290,7 +293,7 @@ patchlens://transactions
 ### Required evidence
 
 - An external Codex task can retrieve the exact active selection.
-- Tool responses never expose files outside the approved project root.
+- Tool responses never expose files outside the configured project root.
 - MCP configuration can be installed and removed without overwriting unrelated user settings.
 
 ### Exit condition

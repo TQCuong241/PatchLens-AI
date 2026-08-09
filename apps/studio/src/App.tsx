@@ -95,22 +95,29 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/auth/session", {
-      method: "POST",
-      credentials: "include",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
+    let retryTimer: number | undefined;
+    let attempts = 0;
+    const refreshInterval = 45 * 60 * 1_000;
+    const authenticate = async (): Promise<void> => {
+      try {
+        const response = await fetch("/api/auth/session", {
+          method: "POST",
+          credentials: "include",
+          signal: controller.signal,
+        });
         if (!response.ok) {
           const body = await response.json().catch(() => undefined) as
             | { message?: string }
             | undefined;
           throw new Error(body?.message ?? `Daemon returned ${response.status}`);
         }
+        attempts = 0;
         setDaemonAuthenticated(true);
         setDaemonAuthError(undefined);
-      })
-      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          retryTimer = window.setTimeout(() => void authenticate(), refreshInterval);
+        }
+      } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
@@ -118,46 +125,81 @@ export function App() {
         setDaemonAuthError(
           error instanceof Error ? error.message : "Local daemon authentication failed",
         );
-      });
-    return () => controller.abort();
+        attempts += 1;
+        if (attempts < 30 && !controller.signal.aborted) {
+          retryTimer = window.setTimeout(() => void authenticate(), 500);
+        }
+      }
+    };
+    void authenticate();
+    return () => {
+      controller.abort();
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+      }
+    };
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-
-    fetch("/api/health", { signal: controller.signal })
-      .then(async (response) => {
+    let retryTimer: number | undefined;
+    let attempts = 0;
+    const readHealth = async (): Promise<void> => {
+      try {
+        const response = await fetch("/api/health", { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`Daemon returned ${response.status}`);
         }
-        return (await response.json()) as DaemonHealth;
-      })
-      .then((health) => {
-        setDaemonHealth(health);
+        setDaemonHealth((await response.json()) as DaemonHealth);
         setDaemonError(undefined);
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
         setDaemonError(error instanceof Error ? error.message : "Daemon is offline");
-      });
-
-    return () => controller.abort();
+        attempts += 1;
+        if (attempts < 30 && !controller.signal.aborted) {
+          retryTimer = window.setTimeout(() => void readHealth(), 500);
+        }
+      }
+    };
+    void readHealth();
+    return () => {
+      controller.abort();
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+      }
+    };
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/project", { signal: controller.signal })
-      .then(async (response) => {
+    let retryTimer: number | undefined;
+    let attempts = 0;
+    const readProject = async (): Promise<void> => {
+      try {
+        const response = await fetch("/api/project", { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`Daemon returned ${response.status}`);
         }
-        return (await response.json()) as DaemonProjectInfo;
-      })
-      .then(setProjectInfo)
-      .catch(() => undefined);
-    return () => controller.abort();
+        setProjectInfo((await response.json()) as DaemonProjectInfo);
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        attempts += 1;
+        if (attempts < 30 && !controller.signal.aborted) {
+          retryTimer = window.setTimeout(() => void readProject(), 500);
+        }
+      }
+    };
+    void readProject();
+    return () => {
+      controller.abort();
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -168,7 +210,11 @@ export function App() {
 
   useEffect(() => {
     function handleMessage(event: MessageEvent<unknown>): void {
-      if (event.origin !== previewOrigin || !isInspectorMessage(event.data)) {
+      if (
+        event.source !== iframeRef.current?.contentWindow ||
+        event.origin !== previewOrigin ||
+        !isInspectorMessage(event.data)
+      ) {
         return;
       }
 
@@ -215,6 +261,16 @@ export function App() {
       return;
     }
 
+    const updateSurfaceSize = (): void => {
+      const rectangle = surface.getBoundingClientRect();
+      setSurfaceSize({ width: rectangle.width, height: rectangle.height });
+    };
+    if (typeof ResizeObserver !== "function") {
+      updateSurfaceSize();
+      window.addEventListener("resize", updateSurfaceSize);
+      return () => window.removeEventListener("resize", updateSurfaceSize);
+    }
+
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) {
         return;
@@ -226,6 +282,7 @@ export function App() {
     });
 
     observer.observe(surface);
+    updateSurfaceSize();
     return () => observer.disconnect();
   }, []);
 
@@ -1233,7 +1290,7 @@ export function App() {
 }
 
 function createMessageId(): string {
-  return typeof crypto.randomUUID === "function"
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }

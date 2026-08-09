@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import {
   createServer,
   request as createProxyRequest,
@@ -10,7 +10,10 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { startPatchLensMcpServer } from "@patchlens-ai/mcp-server";
+import {
+  resolveDaemonUrl,
+  startPatchLensMcpServer,
+} from "@patchlens-ai/mcp-server";
 
 export type CliIO = {
   log(message: string): void;
@@ -63,18 +66,25 @@ export async function runCli(
 
   if (command === "mcp") {
     const connection = await readDaemonConnection(process.cwd());
-    const authToken = process.env.PATCHLENS_AUTH_TOKEN ?? connection?.token;
+    const configuredAuthToken = process.env.PATCHLENS_AUTH_TOKEN;
+    const authToken = configuredAuthToken ?? connection?.token;
     if (!authToken) {
       io.error(
         "PatchLens could not find the running daemon token. Start the daemon and run this command from the project root.",
       );
       return 1;
     }
-    await startPatchLensMcpServer({
-      daemonUrl: process.env.PATCHLENS_DAEMON_URL ?? connection?.daemonUrl,
-      authToken,
-    });
-    return 0;
+    try {
+      await startPatchLensMcpServer({
+        daemonUrl: process.env.PATCHLENS_DAEMON_URL ??
+          (configuredAuthToken ? undefined : connection?.daemonUrl),
+        authToken,
+      });
+      return 0;
+    } catch (error) {
+      io.error(error instanceof Error ? error.message : "PatchLens MCP could not start.");
+      return 1;
+    }
   }
 
   io.error(`Unknown PatchLens command: ${command}`);
@@ -131,7 +141,7 @@ async function initializeProject(projectRoot: string, io: CliIO): Promise<number
   io.log(`PatchLens initialized for ${framework}.`);
   io.log("Created .patchlens/config.json");
   io.log("Protected local transaction state in .gitignore");
-  io.log("Next: add `patchLens()` to the Vite plugins, then run `patchlens start`.");
+  io.log("Next: add `patchLens()` from `@patchlens-ai/dev` to the Vite plugins, then run `patchlens start`.");
   return 0;
 }
 
@@ -152,11 +162,21 @@ async function startPatchLens(
     DEFAULT_STUDIO_PORT,
   );
   const daemonPort = parseCliPort(
-    process.env.PATCHLENS_DAEMON_PORT,
+    readArgument(arguments_, "--daemon-port") ?? process.env.PATCHLENS_DAEMON_PORT,
     4311,
   );
   const daemonUrl = `http://127.0.0.1:${daemonPort}`;
-  const previewUrl = config.preview?.url ?? "http://127.0.0.1:5173";
+  let previewUrl: string;
+  try {
+    previewUrl = parsePreviewUrl(
+      readArgument(arguments_, "--preview-url") ?? config.preview?.url,
+    );
+  } catch (error) {
+    io.error(error instanceof Error ? error.message : "Preview URL is invalid.");
+    return 1;
+  }
+  const previewCommand = readArgument(arguments_, "--preview-command")
+    ?? config.preview?.command;
   const noPreview = arguments_.includes("--no-preview");
   const services: RunningService[] = [];
   let studioServer: Server | undefined;
@@ -172,8 +192,8 @@ async function startPatchLens(
       return 1;
     }
 
-    if (!noPreview && config.preview?.command) {
-      const previewProcess = spawn(config.preview.command, {
+    if (!noPreview && previewCommand) {
+      const previewProcess = spawn(previewCommand, {
         cwd: projectRoot,
         env: process.env,
         shell: true,
@@ -181,6 +201,8 @@ async function startPatchLens(
         stdio: "inherit",
       });
       services.push({ name: "preview", process: previewProcess });
+    } else if (!noPreview) {
+      io.log("No preview command is configured; using an already-running preview.");
     }
 
     const daemonEntry = fileURLToPath(
@@ -214,7 +236,6 @@ async function startPatchLens(
 
     return await waitForWorkspaceExit({
       services,
-      studioServer,
       io,
       stop: async () => {
         if (stopping) {
@@ -252,6 +273,24 @@ function parseCliPort(value: string | undefined, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
 }
 
+function parsePreviewUrl(value: string | undefined): string {
+  const candidate = value ?? "http://127.0.0.1:5173";
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("Preview URL must use HTTP or HTTPS.");
+    }
+    if (url.username || url.password) {
+      throw new Error("Preview URL must not contain embedded credentials.");
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : "Preview URL is invalid.",
+    );
+  }
+}
+
 async function waitForDaemon(daemonUrl: string): Promise<void> {
   const deadline = Date.now() + 12_000;
   let lastError = "";
@@ -272,14 +311,32 @@ async function waitForDaemon(daemonUrl: string): Promise<void> {
   throw new Error(`PatchLens daemon did not start (${lastError || "timeout"}).`);
 }
 
-function createStudioServer(studioDist: string, daemonUrl: string): Server {
+export function createStudioServer(studioDist: string, daemonUrl: string): Server {
   return createServer((request, response) => {
-    if (request.url?.startsWith("/api/")) {
+    const requestPath = readRequestPath(request.url);
+    if (requestPath?.startsWith("/api/")) {
       proxyDaemonRequest(request, response, daemonUrl);
+      return;
+    }
+    if (requestPath === undefined) {
+      sendText(response, 400, "Invalid URL.");
       return;
     }
     void serveStudioFile(request, response, studioDist);
   });
+}
+
+function readRequestPath(requestUrl: string | undefined): string | undefined {
+  try {
+    const parsed = new URL(requestUrl ?? "/", "http://patchlens.local");
+    // Reject absolute-form URLs so the proxy can never be redirected off-loopback.
+    if (parsed.origin !== "http://patchlens.local") {
+      return undefined;
+    }
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return undefined;
+  }
 }
 
 function proxyDaemonRequest(
@@ -287,7 +344,12 @@ function proxyDaemonRequest(
   response: ServerResponse,
   daemonUrl: string,
 ): void {
-  const target = new URL(request.url ?? "/", daemonUrl);
+  const requestPath = readRequestPath(request.url);
+  if (!requestPath) {
+    sendText(response, 400, "Invalid URL.");
+    return;
+  }
+  const target = new URL(requestPath, daemonUrl);
   const headers = { ...request.headers, host: target.host };
   delete headers.connection;
   const proxy = createProxyRequest(
@@ -345,6 +407,17 @@ async function serveStudioFile(
     file = path.join(studioDist, "index.html");
   }
   try {
+    const rootRealPath = await realpath(studioDist);
+    const fileRealPath = await realpath(file);
+    const realRelative = path.relative(rootRealPath, fileRealPath);
+    if (
+      realRelative === ".." ||
+      realRelative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(realRelative)
+    ) {
+      sendText(response, 403, "Path rejected.");
+      return;
+    }
     const content = await readFile(file);
     const contentType = contentTypeFor(file);
     response.statusCode = 200;
@@ -381,8 +454,18 @@ function contentTypeFor(file: string): string {
     case ".jpg":
     case ".jpeg":
       return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    case ".ico":
+      return "image/x-icon";
     case ".woff2":
       return "font/woff2";
+    case ".woff":
+      return "font/woff";
+    case ".map":
+      return "application/json; charset=utf-8";
     default:
       return "application/octet-stream";
   }
@@ -414,7 +497,6 @@ async function closeServer(server: Server | undefined): Promise<void> {
 
 async function waitForWorkspaceExit(input: {
   services: RunningService[];
-  studioServer: Server;
   io: CliIO;
   stop(): Promise<void>;
 }): Promise<number> {
@@ -453,6 +535,9 @@ async function waitForWorkspaceExit(input: {
       };
       exitHandlers.set(service.process, handler);
       service.process.on("exit", handler);
+      if (service.process.exitCode !== null) {
+        handler(service.process.exitCode, null);
+      }
     }
   });
 }
@@ -473,7 +558,17 @@ async function terminateService(service: RunningService): Promise<void> {
     });
     return;
   }
-  child.kill("SIGTERM");
+  await new Promise<void>((resolve) => {
+    const finish = (): void => {
+      child.removeListener("exit", finishOnExit);
+      clearTimeout(timeout);
+      resolve();
+    };
+    const finishOnExit = (): void => finish();
+    const timeout = setTimeout(finish, 2_000);
+    child.once("exit", finishOnExit);
+    child.kill("SIGTERM");
+  });
 }
 
 async function runDoctor(projectRoot: string, io: CliIO): Promise<number> {
@@ -492,18 +587,27 @@ async function runDoctor(projectRoot: string, io: CliIO): Promise<number> {
 
   try {
     const connection = await readDaemonConnection(projectRoot);
-    const daemonUrl = process.env.PATCHLENS_DAEMON_URL ?? connection?.daemonUrl
-      ?? DEFAULT_DAEMON_URL;
-    const authToken = process.env.PATCHLENS_AUTH_TOKEN ?? connection?.token;
+    const configuredAuthToken = process.env.PATCHLENS_AUTH_TOKEN;
+    const daemonUrl = resolveDaemonUrl(
+      process.env.PATCHLENS_DAEMON_URL ??
+        (configuredAuthToken ? undefined : connection?.daemonUrl) ??
+        DEFAULT_DAEMON_URL,
+    );
+    const authToken = configuredAuthToken ?? connection?.token;
     const response = await fetch(`${daemonUrl.replace(/\/$/, "")}/api/health`, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
       signal: AbortSignal.timeout(700),
     });
-    io.log(`  Daemon: ${response.ok ? "online" : `HTTP ${response.status}`}`);
     if (response.ok) {
       const health = await response.json() as {
+        ok?: unknown;
+        service?: unknown;
         providers?: Array<{ id: string; status: string; detail?: string }>;
       };
+      if (health.ok !== true || health.service !== "patchlens-daemon") {
+        io.log("  Daemon: unexpected service response");
+        return projectPackage ? 0 : 1;
+      }
+      io.log("  Daemon: online");
       for (const provider of health.providers ?? []) {
         io.log(
           `    ${provider.id}: ${provider.status}${provider.detail ? ` (${provider.detail})` : ""}`,
@@ -523,6 +627,8 @@ async function runDoctor(projectRoot: string, io: CliIO): Promise<number> {
             ? `rejected (HTTP ${protectedResponse.status})`
             : "connection token not found"}`,
       );
+    } else {
+      io.log(`  Daemon: HTTP ${response.status}`);
     }
   } catch {
     io.log("  Daemon: offline");
@@ -561,8 +667,14 @@ function detectFramework(projectPackage: ProjectPackage): string {
   return "unknown";
 }
 
-function inferDevCommand(projectPackage: ProjectPackage): string {
-  return projectPackage.scripts?.dev ? "npm run dev" : "npm start";
+function inferDevCommand(projectPackage: ProjectPackage): string | undefined {
+  if (projectPackage.scripts?.dev) {
+    return "npm run dev";
+  }
+  if (projectPackage.scripts?.start) {
+    return "npm start";
+  }
+  return undefined;
 }
 
 async function exists(file: string): Promise<boolean> {
@@ -607,12 +719,22 @@ async function readDaemonConnection(projectRoot: string): Promise<{
   token?: string;
 } | undefined> {
   try {
+    const file = path.join(projectRoot, ".patchlens", "daemon.json");
+    if ((await stat(file)).size > 64 * 1_024) {
+      return undefined;
+    }
     const value = JSON.parse(
-      await readFile(path.join(projectRoot, ".patchlens", "daemon.json"), "utf8"),
+      await readFile(file, "utf8"),
     ) as { daemonUrl?: unknown; token?: unknown };
     return {
-      daemonUrl: typeof value.daemonUrl === "string" ? value.daemonUrl : undefined,
-      token: typeof value.token === "string" ? value.token : undefined,
+      daemonUrl: typeof value.daemonUrl === "string" && value.daemonUrl.length <= 2_000
+        ? value.daemonUrl
+        : undefined,
+      token: typeof value.token === "string" &&
+          value.token.length >= 24 &&
+          value.token.length <= 500
+        ? value.token
+        : undefined,
     };
   } catch {
     return undefined;
@@ -658,4 +780,7 @@ function printHelp(io: CliIO): void {
   io.log("  doctor   Check the project, framework and local daemon");
   io.log("  mcp      Start the read-only MCP bridge for Codex or Claude");
   io.log("  help     Show this help message");
+  io.log("");
+  io.log("Start options: --no-preview, --studio-port <port>, --daemon-port <port>,");
+  io.log("              --preview-url <url>, --preview-command <command>");
 }

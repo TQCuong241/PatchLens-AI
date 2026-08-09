@@ -17,7 +17,8 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm --filter @patchlens-ai/agent-protocol build && pnpm --filter @patchlens-ai/mcp-server build && pnpm build && node --test dist/index.test.js"
   },
   "dependencies": {
     "@patchlens-ai/daemon": "workspace:*",

@@ -65,7 +65,7 @@ npx patchlens start
 ```
 
 > [!IMPORTANT]
-> The package is not published yet. The monorepo workflow below is the verified development path; the same `init` and `start` flow is being prepared for the first public package release.
+> The package is not published yet. The monorepo workflow below is the intended development path; source-level tests pass, while clean install, build, and browser verification remain open before the first public release.
 
 Once PatchLens Studio is running, the intended workflow is:
 
@@ -81,6 +81,18 @@ Once PatchLens Studio is running, the intended workflow is:
 10. Refresh the preview through the existing development server and HMR.
 11. Show the changed files, verification status, and a safe undo action.
 12. Continue the conversation without losing the original visual selection.
+
+For Vite, add the development plugin once in `vite.config.ts`:
+
+```ts
+import { patchLens } from "@patchlens-ai/dev";
+
+export default defineConfig({
+  plugins: [patchLens(), react()],
+});
+```
+
+The plugin instruments JSX/TSX only while Vite is serving the app and injects the Inspector automatically. It is inactive in production builds.
 
 ## Core interaction loop
 
@@ -355,13 +367,16 @@ The repository currently contains source-level implementations for:
 - A bounded selection-context builder with sanitized DOM, computed styles, accessibility summary, and runtime errors.
 - A provider-independent bridge with deterministic mock, Codex CLI, and Claude Code CLI adapters.
 - Read-only provider execution: providers propose exact replacements and never own repository writes.
-- Atomic multi-file transactions with scope-expansion approval, project-root and symlink authorization, SHA-256 baselines, rollback, durable local history, restart recovery, unified diffs, and conflict-aware undo.
-- Active Diff, History, scope-policy, approval, cancellation, and Undo controls inside Studio.
+- Atomic multi-file transactions with related-file scope approval, configured-root confinement, symlink target checks, SHA-256 baselines, rollback, durable local history, restart recovery, unified diffs, and conflict-aware undo.
+- Active Diff, History, scope-policy, related-file approval, cancellation, and Undo controls inside Studio.
 - A persisted post-patch verification record that checks preview reachability, HMR context refresh, component retention, source mapping, and new runtime errors when the Inspector reports back.
 - A read-only, authenticated MCP server that exposes the current Studio selection and transaction history.
 - Loopback binding and browser-origin restrictions for the local daemon.
 - A React + Vite application used as the visual-selection test surface.
 - CLI commands for `patchlens init`, `patchlens start`, `patchlens doctor`, and `patchlens mcp`.
+- Thirty-one direct Node runtime tests covering protocol guards, CLI behavior, provider parsing and prompt safety, MCP requests, transaction input validation, recovery, rollback, conflicts, and undo.
+
+The launcher currently treats the directory where PatchLens starts as the configured project root and rejects lexical or symlink escapes from that boundary. A dedicated first-run screen for reviewing and explicitly approving the root is still required before public distribution.
 
 The following are not implemented yet or still require full environment verification:
 
@@ -397,7 +412,15 @@ npx patchlens init
 npx patchlens start
 ```
 
-Use `npx patchlens start --no-preview` when the application development server is already running. The launcher stores a short-lived daemon connection record in `.patchlens/daemon.json`; it is ignored by Git and is used by `patchlens mcp` and `patchlens doctor`.
+Use `npx patchlens start --no-preview` when the application development server is already running. The launcher stores an ephemeral daemon connection record in `.patchlens/daemon.json`; it is ignored by Git, used by `patchlens mcp` and `patchlens doctor`, and removed only by the daemon instance that owns it.
+
+Useful launcher overrides:
+
+```bash
+npx patchlens start --no-preview
+npx patchlens start --studio-port 4320 --daemon-port 4321
+npx patchlens start --preview-url http://127.0.0.1:5173 --preview-command "pnpm dev"
+```
 
 To exercise the first real edit transaction:
 
@@ -466,7 +489,8 @@ The MCP process reads the local daemon token, connects only to the loopback daem
 - [x] Capture sanitized DOM and computed styles.
 - [x] Capture the accessibility summary.
 - [ ] Capture selected-region screenshots.
-- [ ] Add custom width and height controls with saved device presets.
+- [x] Add custom width and height controls.
+- [ ] Save custom dimensions as project-level device presets.
 - [ ] Add device scale, touch, hover, and reduced-motion emulation.
 - [ ] Add side-by-side breakpoint comparison without losing selection identity.
 - [ ] Add selection history and selection switching.
@@ -482,7 +506,7 @@ The MCP process reads the local daemon token, connects only to the loopback daem
 - [x] Detect developer changes through before/after content hashes.
 - [x] Generate a unified diff for each applied transaction.
 - [x] Implement transaction-scoped undo without destructive Git commands.
-- [x] Reject lexical and symlink paths outside the approved project root.
+- [x] Reject lexical and symlink paths outside the configured project root.
 - [x] Expose transaction review and undo controls in Studio.
 - [x] Detect scope expansion beyond the selected component.
 - [x] Support atomic multi-file provider transactions with compensating rollback.
@@ -569,10 +593,10 @@ The MCP process reads the local daemon token, connects only to the loopback daem
 
 Allowing an AI agent to edit a repository makes safety part of the architecture, not an optional feature.
 
-- The daemon should bind to `127.0.0.1` by default.
-- Every Studio session should use a local authentication token.
-- The developer must approve the project root.
-- Requests must not write outside the approved root.
+- The daemon binds to `127.0.0.1` by default.
+- Studio authenticates with a local browser session cookie; MCP and CLI clients use a bearer token.
+- The current launcher defines a configured project root and rejects writes outside it.
+- A dedicated first-run project-root review and approval screen is required before public release.
 - Secrets, passwords, tokens, and sensitive form values must be removed from captured DOM.
 - PatchLens must display which provider receives source code or screenshots.
 - Every edit request should create a transaction.
@@ -655,11 +679,11 @@ A browser application cannot freely read repository files, start local coding to
 
 ### How will sensitive data be protected?
 
-PatchLens should sanitize captured DOM, remove sensitive input values, keep the daemon local, require project permission, and clearly identify which provider receives each type of context.
+PatchLens sanitizes captured DOM, removes sensitive input values, keeps the daemon local, confines writes to the configured project root, and identifies which provider receives each type of context. A dedicated root-approval screen remains a release requirement.
 
 ### Is the package ready to install today?
 
-No. The current repository is an early prototype. The intended package name and command-line experience are documented so the implementation can be built toward a stable public contract.
+No. The source-level MVP is implemented, but the package is not published and still needs a clean dependency install, strict typecheck, production builds, provider-version compatibility checks, and browser/HMR end-to-end verification.
 
 ## Documentation
 

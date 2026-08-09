@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,10 @@ import type {
   PatchTransaction,
   PatchVerification,
   UndoPatchTransactionResponse,
+} from "@patchlens-ai/agent-protocol";
+import {
+  isSelectionContext,
+  isVisualSelection,
 } from "@patchlens-ai/agent-protocol";
 import {
   CodingProviderError,
@@ -39,6 +43,7 @@ const previewUrl = process.env.PATCHLENS_PREVIEW_URL ?? "http://127.0.0.1:4312";
 const port = parsePort(process.env.PATCHLENS_DAEMON_PORT);
 const daemonToken = createDaemonToken(process.env.PATCHLENS_AUTH_TOKEN);
 const daemonConnectionFile = path.join(projectRoot, ".patchlens", "daemon.json");
+let ownedDaemonConnectionFile: string | undefined;
 const sessions = new Map<string, AgentSession>();
 let activeSelection: ActiveSelectionSnapshot | undefined;
 const activeRequests = new Map<string, AbortController>();
@@ -74,7 +79,7 @@ const server = createServer(async (request, response) => {
       }
       response.setHeader(
         "Set-Cookie",
-        `${SESSION_COOKIE_NAME}=${encodeURIComponent(daemonToken)}; HttpOnly; SameSite=Strict; Path=/api`,
+        `${SESSION_COOKIE_NAME}=${encodeURIComponent(daemonToken)}; Max-Age=3600; HttpOnly; SameSite=Strict; Path=/api`,
       );
       sendJson(response, 200, { ok: true });
       return;
@@ -367,28 +372,32 @@ function validateAgentRequest(value: AgentRequest): void {
     throw new Error("Selection context does not match the selected element.");
   }
   validateSelectionPayload(value.selection, value.context);
-  if (
-    value.conversation &&
-    (
-      value.conversation.length > 40 ||
-      value.conversation.some((message) =>
-        !["user", "assistant"].includes(message.role) ||
-        typeof message.content !== "string" ||
-        message.content.length > 8000
-      )
+  if (value.conversation !== undefined && (
+    !Array.isArray(value.conversation) ||
+    value.conversation.length > 40 ||
+    value.conversation.some((message) =>
+      !message ||
+      typeof message !== "object" ||
+      !["user", "assistant"].includes(message.role) ||
+      typeof message.content !== "string" ||
+      message.content.length > 8000
     )
-  ) {
+  )) {
     throw new Error("The PatchLens conversation context exceeds its safe limits.");
   }
-  if (
-    value.approvedScopeExpansion &&
-    (
-      value.approvedScopeExpansion.length > 64 ||
-      value.approvedScopeExpansion.some((file) =>
-        typeof file !== "string" || !file || file.length > 1000 || file.includes("\0")
+  if (value.approvedScopeExpansion !== undefined && (
+    !Array.isArray(value.approvedScopeExpansion) ||
+    value.approvedScopeExpansion.length > 64 ||
+    value.approvedScopeExpansion.some((file) =>
+        typeof file !== "string" ||
+        !file ||
+        file.length > 1000 ||
+        file.includes("\0") ||
+        path.isAbsolute(file) ||
+        file.startsWith("../") ||
+        file.startsWith("..\\")
       )
-    )
-  ) {
+  )) {
     throw new Error("The approved PatchLens scope expansion is invalid.");
   }
 }
@@ -397,12 +406,17 @@ function validateSelectionPayload(
   selection: AgentRequest["selection"],
   context?: AgentRequest["context"],
 ): void {
+  if (!isVisualSelection(selection)) {
+    throw new Error("The PatchLens visual selection exceeds its safe limits.");
+  }
   if (
     typeof selection.id !== "string" ||
     selection.id.length > 240 ||
     !["element", "region"].includes(selection.kind) ||
     typeof selection.route !== "string" ||
     selection.route.length > 2000 ||
+    typeof selection.createdAt !== "string" ||
+    selection.createdAt.length > 100 ||
     !["exact", "likely", "visual-only"].includes(selection.confidence) ||
     !Array.isArray(selection.elements) ||
     selection.elements.length > 16 ||
@@ -432,6 +446,9 @@ function validateSelectionPayload(
   if (!context) {
     return;
   }
+  if (!isSelectionContext(context)) {
+    throw new Error("The PatchLens selection context exceeds its safe limits.");
+  }
   if (
     context.selection.id !== selection.id ||
     typeof context.sanitizedHtml !== "string" ||
@@ -447,6 +464,18 @@ function validateSelectionPayload(
     context.consoleErrors.some((error) =>
       typeof error !== "string" || error.length > 1000
     ) ||
+    typeof context.capturedAt !== "string" ||
+    context.capturedAt.length > 100 ||
+    typeof context.approximateBytes !== "number" ||
+    !Number.isFinite(context.approximateBytes) ||
+    context.approximateBytes < 0 ||
+    !context.truncated ||
+    typeof context.truncated.html !== "boolean" ||
+    typeof context.truncated.styles !== "boolean" ||
+    typeof context.truncated.consoleErrors !== "boolean" ||
+    (context.accessibilitySummary !== undefined &&
+      (typeof context.accessibilitySummary !== "string" ||
+        context.accessibilitySummary.length > 2000)) ||
     Buffer.byteLength(JSON.stringify(context), "utf8") > MAX_SELECTION_CONTEXT_BYTES
   ) {
     throw new Error("The PatchLens selection context exceeds its safe limits.");
@@ -490,6 +519,10 @@ function isSourceLocation(
     value.file.length > 0 &&
     value.file.length <= 1000 &&
     !value.file.includes("\0") &&
+    !path.isAbsolute(value.file) &&
+    !value.file.startsWith("../") &&
+    !value.file.startsWith("..\\") &&
+    value.file !== "." &&
     Number.isInteger(value.line) &&
     value.line > 0 &&
     Number.isInteger(value.column) &&
@@ -501,7 +534,8 @@ function isSourceLocation(
     (
       value.tagName === undefined ||
       (typeof value.tagName === "string" && value.tagName.length <= 120)
-    ),
+    ) &&
+    (value.framework === "react" || value.framework === "next" || value.framework === "unknown"),
   );
 }
 
@@ -518,7 +552,10 @@ function samePath(left: string, right: string | undefined): boolean {
   if (!right) {
     return false;
   }
-  const normalize = (value: string) => value.replace(/\\/g, "/").toLowerCase();
+  const normalize = (value: string) => {
+    const normalized = value.replace(/\\/g, "/").replace(/^\.\//, "");
+    return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  };
   return normalize(left) === normalize(right);
 }
 
@@ -690,7 +727,13 @@ function handleError(response: ServerResponse, error: unknown): void {
     return;
   }
   if (error instanceof CodingProviderError) {
-    const status = error.code === "provider_unavailable" ? 503 : 400;
+    const status = error.code === "provider_unavailable"
+      ? 503
+      : error.code === "provider_timeout"
+        ? 504
+        : error.code === "provider_cancelled"
+          ? 409
+          : 400;
     sendJson(response, status, { error: error.code, message });
     return;
   }
@@ -812,9 +855,14 @@ function shutdown(): void {
   for (const controller of activeRequests.values()) {
     controller.abort();
   }
-  server.close(() => {
-    void rm(daemonConnectionFile, { force: true }).finally(() => process.exit(0));
-  });
+  const finish = (): void => {
+    void removeOwnedDaemonConnectionFile().finally(() => process.exit(0));
+  };
+  if (server.listening) {
+    server.close(finish);
+  } else {
+    finish();
+  }
 }
 
 process.on("SIGINT", shutdown);
@@ -867,8 +915,22 @@ function parseCookies(header: string | undefined): Map<string, string> {
 async function writeDaemonConnectionFile(): Promise<void> {
   const directory = path.dirname(daemonConnectionFile);
   await mkdir(directory, { recursive: true });
+  const [rootRealPath, directoryRealPath] = await Promise.all([
+    realpath(projectRoot),
+    realpath(directory),
+  ]);
+  const relativeDirectory = path.relative(rootRealPath, directoryRealPath);
+  if (
+    !relativeDirectory ||
+    relativeDirectory === ".." ||
+    relativeDirectory.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeDirectory)
+  ) {
+    throw new Error("The PatchLens connection directory must stay inside the project root.");
+  }
+  const connectionFile = path.join(directoryRealPath, path.basename(daemonConnectionFile));
   const temporaryFile = path.join(
-    directory,
+    directoryRealPath,
     `.daemon-${randomUUID()}.tmp`,
   );
   const body = `${JSON.stringify({
@@ -886,9 +948,45 @@ async function writeDaemonConnectionFile(): Promise<void> {
       flag: "wx",
       mode: 0o600,
     });
-    await rename(temporaryFile, daemonConnectionFile);
+    try {
+      await rename(temporaryFile, connectionFile);
+    } catch (error) {
+      // Windows may refuse to replace an existing record. Remove the directory entry
+      // before retrying so writeFile can never follow a hostile symlink target.
+      if (!isNodeError(error) || !["EEXIST", "EPERM", "ENOTEMPTY"].includes(error.code ?? "")) {
+        throw error;
+      }
+      await rm(connectionFile, { force: true });
+      await rename(temporaryFile, connectionFile);
+    }
+    ownedDaemonConnectionFile = connectionFile;
   } catch (error) {
     await rm(temporaryFile, { force: true }).catch(() => undefined);
     throw error;
   }
+}
+
+async function removeOwnedDaemonConnectionFile(): Promise<void> {
+  const connectionFile = ownedDaemonConnectionFile;
+  if (!connectionFile) {
+    return;
+  }
+  let ownsRecord = false;
+  try {
+    const raw = await readFile(connectionFile, "utf8");
+    const value = JSON.parse(raw) as { processId?: unknown; token?: unknown };
+    if (value.processId !== process.pid || value.token !== daemonToken) {
+      return;
+    }
+    ownsRecord = true;
+  } catch {
+    // A missing or malformed record should not be removed during shutdown.
+  }
+  if (ownsRecord) {
+    await rm(connectionFile, { force: true });
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }

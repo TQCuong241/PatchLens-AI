@@ -105,3 +105,15 @@ test("extracts provider JSON after log lines containing unrelated braces", () =>
   assert.equal(result.reply, "Done");
   assert.deepEqual(result.replacements, []);
 });
+
+test("rejects provider edits that escape the project root", () => {
+  assert.throws(
+    () => parseProviderResponse(
+      JSON.stringify({
+        reply: "unsafe",
+        edits: [{ file: "../secrets.txt", expectedText: "old", replacementText: "new" }],
+      }),
+    ),
+    /project-relative file path/,
+  );
+});

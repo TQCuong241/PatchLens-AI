@@ -316,10 +316,23 @@ function toolJson(value: unknown): unknown {
   };
 }
 
-function resolveDaemonUrl(value: string | undefined): string {
-  const url = new URL(value ?? process.env.PATCHLENS_DAEMON_URL ?? "http://127.0.0.1:4311");
+export function resolveDaemonUrl(value: string | undefined): string {
+  let url: URL;
+  try {
+    url = new URL(value ?? process.env.PATCHLENS_DAEMON_URL ?? "http://127.0.0.1:4311");
+  } catch {
+    throw new Error("PatchLens MCP requires a valid loopback daemon URL.");
+  }
   const loopbackHosts = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
-  if (url.protocol !== "http:" || !loopbackHosts.has(url.hostname)) {
+  if (
+    url.protocol !== "http:" ||
+    !loopbackHosts.has(url.hostname) ||
+    url.username ||
+    url.password ||
+    (url.pathname !== "/" && url.pathname !== "") ||
+    url.search ||
+    url.hash
+  ) {
     throw new Error("PatchLens MCP only connects to an HTTP daemon on the local loopback interface.");
   }
   return url.toString().replace(/\/$/, "");

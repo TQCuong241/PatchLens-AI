@@ -66,7 +66,7 @@ test("refuses undo after a concurrent developer edit", async () => {
   }
 });
 
-test("rejects paths outside the approved project root", async () => {
+test("rejects paths outside the configured project root", async () => {
   const fixture = await createFixture();
 
   try {
@@ -79,7 +79,52 @@ test("rejects paths outside the approved project root", async () => {
         expectedText: "Start planning",
         replacementText: "Launch workspace",
       }),
-      /outside the approved project root/,
+      /invalid project-relative file path|outside the configured project root/,
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("returns a transaction error for malformed replacement input", async () => {
+  const fixture = await createFixture();
+
+  try {
+    await assert.rejects(
+      () => fixture.manager.applyTextReplacements({
+        sessionId: "session_test",
+        selectionId: "selection_test",
+        instruction: "update",
+        changes: [{
+          file: "",
+          expectedText: "old",
+          replacementText: "new",
+        }],
+      }),
+      /project-relative file/,
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects malformed transaction scope metadata", async () => {
+  const fixture = await createFixture();
+
+  try {
+    await assert.rejects(
+      () => fixture.manager.applyTextReplacements({
+        sessionId: "session_test",
+        selectionId: "selection_test",
+        instruction: "update",
+        changes: [{
+          file: "src/App.tsx",
+          expectedText: "Start planning",
+          replacementText: "Launch workspace",
+        }],
+        selectedFiles: "src/App.tsx" as unknown as string[],
+      }),
+      /selected source scope/,
     );
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
@@ -246,6 +291,18 @@ test("creates separate unified diff hunks and accurate line counts", async () =>
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }
+});
+
+test("keeps newline markers correct for empty-file diffs", () => {
+  const added = createUnifiedDiff("src/Empty.ts", "", "value\n");
+  const removed = createUnifiedDiff("src/Empty.ts", "value\n", "");
+
+  assert.match(added, /@@ -0,0 \+1 @@/);
+  assert.match(added, /^\+value$/m);
+  assert.doesNotMatch(added, /No newline at end of file/);
+  assert.match(removed, /@@ -1 \+0,0 @@/);
+  assert.match(removed, /^-value$/m);
+  assert.doesNotMatch(removed, /No newline at end of file/);
 });
 
 async function createFixture(): Promise<{
