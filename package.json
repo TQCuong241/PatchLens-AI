@@ -1,0 +1,23 @@
+{
+  "name": "patchlens-ai",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Visual context layer for AI coding agents.",
+  "packageManager": "pnpm@10.16.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "build:packages": "pnpm --filter \"./packages/**\" build",
+    "dev": "pnpm build:packages && concurrently -k -n daemon,demo,studio -c green,yellow,cyan \"pnpm --filter @patchlens-ai/daemon dev\" \"pnpm --filter @patchlens-ai/react-vite-demo dev\" \"pnpm --filter @patchlens-ai/studio dev\"",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
