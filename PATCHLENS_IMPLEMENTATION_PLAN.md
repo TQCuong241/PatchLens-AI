@@ -1,336 +1,409 @@
-# PatchLens - Dac ta kien truc va ke hoach trien khai
+# PatchLens AI - Technical architecture and implementation plan
 
-> Trang thai: Ban nhap de bat dau trien khai
+> Status: early implementation draft
 >
-> Muc tieu: Cho phep nguoi dung chon mot vung tren giao dien web, mo chat gan voi vung do, va yeu cau Codex, Claude hoac coding agent khac tu dong sua dung component trong repository.
+> Objective: let a developer select a visible region in a live web preview, attach a conversation to that selection, and allow Codex, Claude, or another coding agent to edit the corresponding source code safely.
 
-## 1. Tam nhin san pham
+## 1. Product objective
 
-PatchLens la mot bo cong cu development cai vao du an Node.js. No cung cap mot giao dien preview co kha nang:
+PatchLens AI is a development tool installed into an existing Node.js web project. It should provide a live preview where a developer can:
 
-1. Hover, click hoac keo chuot de chon mot phan giao dien.
-2. Tu dong anh xa DOM da chon ve component, file va dong code nguon.
-3. Hien khung chat ngay ben duoi hoac ben canh vung da chon.
-4. Gan chat voi mot phien Codex, Claude hoac coding agent dang lam viec tren repository.
-5. Gui day du ngu canh cua vung chon cho agent.
-6. De agent tu dong sua file trong repository.
-7. Cap nhat preview qua HMR, hien diff va cho phep undo.
+1. Switch between desktop, tablet, mobile, and later custom responsive viewports.
+2. Hover, click, or drag to select part of the interface.
+3. Resolve the selected DOM region to component and source candidates.
+4. Open a chat beside the selected region.
+5. Attach the chat to a managed or external coding-agent session.
+6. Send structured visual, source, and responsive context to the agent.
+7. Allow the agent to edit repository files.
+8. Refresh through the existing development server and HMR.
+9. Show changed files, verification results, and transaction-scoped undo.
 
-Gia tri cot loi khong nam o viec chup anh man hinh. Gia tri cot loi la **Visual-to-Code Grounding**: bien mot vung nhin thay tren giao dien thanh mot vi tri code co do tin cay cao.
+The core technical problem is **visual-to-code grounding**. PatchLens must translate a visible selection into reliable source context instead of asking the agent to infer everything from a screenshot or natural-language description.
 
-## 2. Nguyen tac thiet ke
+## 2. Product boundaries
 
-- **Local-first:** Studio, daemon va agent bridge chay tren may nguoi dung.
-- **Provider-independent:** UI va Inspector khong phu thuoc rieng Codex hay Claude.
-- **Development-only:** Ma Inspector khong duoc dua vao production build.
-- **Safe automation:** Agent co the tu sua code, nhung moi request deu co diff va kha nang undo.
-- **Preserve user changes:** Khong reset hoac ghi de cac thay doi nguoi dung dang lam.
-- **Progressive framework support:** Bat dau voi React + Vite, sau do mo rong sang Next.js va framework khac.
-- **Explicit session ownership:** PatchLens phai biet agent session nao dang xu ly du an; khong tu y chiem quyen mot cuoc chat ben ngoai.
+### In scope
 
-## 3. Trai nghiem nguoi dung muc tieu
+- Local development repositories.
+- React + Vite as the first supported environment.
+- Development-time JSX and TSX instrumentation.
+- Click and rectangle-drag selection.
+- Desktop, tablet, and mobile responsive preview modes.
+- Responsive viewport metadata included in agent context.
+- Component, file, line, and column candidates.
+- Chat attached to a selection.
+- Local agent session orchestration.
+- Codex as the first managed provider.
+- MCP access for explicitly configured external agents.
+- File transactions, diff review, verification, and safe undo.
 
-```text
-npm install -D @patchlens/dev
+### Not in the first release
+
+- Arbitrary production websites.
+- Cross-origin DOM inspection without an extension or proxy.
+- Automatic control of any unrelated Codex or Claude conversation.
+- Every frontend framework at launch.
+- A proprietary website builder or hosted replacement for the user's repository.
+- Silent editing without visible transaction state.
+
+## 3. Design principles
+
+- **Local-first:** Studio, daemon, source manifest, and agent bridges run on the developer's machine.
+- **Provider-independent:** Inspector and Studio use a shared protocol rather than provider-specific logic.
+- **Development-only instrumentation:** source identifiers must not enter production output.
+- **Structured context:** send bounded, inspectable data instead of an unstructured prompt dump.
+- **Safe automation:** every autonomous edit belongs to a recoverable transaction.
+- **Preserve developer work:** unrelated uncommitted changes must remain intact.
+- **Explicit permissions:** project roots, providers, screenshots, and external bridges require clear authorization.
+- **Measured confidence:** ambiguous selections must be reported as ambiguous.
+- **Progressive support:** stabilize one framework and provider before expanding.
+
+## 4. Target developer experience
+
+```bash
+npm install --save-dev @patchlens-ai/dev
 npx patchlens init
 npx patchlens connect codex
 npm run patchlens
 ```
 
-Sau khi Studio mo:
+Target interaction:
 
 ```text
-Mo preview
-  -> Bat che do Select
-  -> Hover de highlight element
-  -> Click de chon mot element
-     hoac keo chuot de chon mot nhom element
-  -> PatchLens xac dinh component/file/dong code
-  -> Chat neo ben duoi vung chon
-  -> Nguoi dung nhap yeu cau
-  -> Agent tu sua code
-  -> Dev server HMR cap nhat preview
-  -> PatchLens kiem tra thay doi va hien diff
-  -> Nguoi dung tiep tuc chat hoac undo
+Open PatchLens Studio
+  → load the project's development preview
+  → choose Desktop, Tablet, Mobile, or a custom viewport
+  → enable selection mode
+  → hover to inspect an element
+  → click one element or drag across a region
+  → resolve source candidates
+  → show chat beside the selection
+  → send the request to the active agent session
+  → capture agent-owned file changes
+  → wait for HMR
+  → verify the selected region
+  → show diff, result, and undo
 ```
 
-## 4. Kien truc tong the
+## 5. System architecture
 
 ```mermaid
 flowchart TD
-    User["Nguoi dung click hoac keo vung"] --> Inspector["Inspector Runtime"]
-    Compiler["Vite/Next Compiler Plugin"] --> Manifest["Source Manifest"]
-    Inspector --> Selection["Selection Engine"]
-    Manifest --> Selection
-    Selection --> Context["Selection Context"]
-    Context --> Chat["Anchored Chat Overlay"]
+    User["Developer click or drag"] --> Inspector["Inspector Runtime"]
+    Compiler["Framework Compiler Plugin"] --> Manifest["Source Manifest"]
+    Inspector --> Engine["Selection Engine"]
+    Manifest --> Engine
+    Engine --> Context["Selection Context Builder"]
+    Context --> Chat["Anchored Chat"]
     Chat --> Daemon["Local Daemon"]
-    Daemon --> Registry["Agent Session Registry"]
-    Registry --> Adapter{"Provider Adapter"}
-    Adapter --> Codex["Codex"]
-    Adapter --> Claude["Claude"]
-    Codex --> Files["Repository Files"]
-    Claude --> Files
-    Files --> HMR["Dev Server HMR"]
-    HMR --> Inspector
-    Files --> Review["Diff, Verification, Undo"]
+    Daemon --> Sessions["Agent Session Registry"]
+    Sessions --> Provider{"Provider Adapter"}
+    Provider --> Codex["Codex"]
+    Provider --> Claude["Claude"]
+    Codex --> Repository["Repository Files"]
+    Claude --> Repository
+    Repository --> Transaction["Patch Transaction"]
+    Repository --> HMR["Development Server HMR"]
+    HMR --> Verify["Visual and Runtime Verification"]
+    Verify --> Chat
 ```
 
-## 5. Cau truc monorepo de xuat
+## 6. Proposed monorepo structure
 
 ```text
-patchlens/
-|-- apps/
-|   |-- studio/                  # Preview, toolbar, anchored chat, diff viewer
-|   `-- daemon/                  # Local server, project va agent sessions
-|
-|-- packages/
-|   |-- cli/                     # init, dev, connect, disconnect, doctor
-|   |-- dev/                     # Package duy nhat nguoi dung can cai
-|   |-- inspector-runtime/       # Hover, click, drag selection
-|   |-- selection-engine/        # DOM rectangle -> component candidates
-|   |-- source-mapper/           # patchlensId -> file/line/component
-|   |-- compiler-vite/           # AST transform cho React + Vite
-|   |-- compiler-next/           # Ho tro Next.js trong giai doan sau
-|   |-- anchored-chat/           # UI chat doc lap voi CSS cua website
-|   |-- agent-protocol/          # Type, schema va event chung
-|   |-- mcp-server/              # Bridge cho coding agent ben ngoai
-|   |-- provider-codex/          # Codex session adapter
-|   |-- provider-claude/         # Claude session adapter
-|   |-- patch-transaction/       # Diff, checkpoint va undo
-|   `-- visual-verifier/         # Screenshot truoc/sau va kiem tra preview
-|
-|-- examples/
-|   `-- react-vite-demo/
-|
-|-- docs/
-|   |-- protocol.md
-|   |-- inspector.md
-|   `-- provider-adapters.md
-|
-|-- package.json
-|-- pnpm-workspace.yaml
-`-- tsconfig.base.json
+patchlens-ai/
+├── apps/
+│   ├── studio/                  # Live preview, selection UI, chat, review
+│   └── daemon/                  # Project permissions, sessions, file transactions
+│
+├── packages/
+│   ├── agent-protocol/          # Provider-independent contracts
+│   ├── cli/                     # init, doctor, connect, disconnect
+│   ├── dev/                     # Public development dependency
+│   ├── inspector-runtime/       # Hover, click, drag, overlay
+│   ├── compiler-vite/           # React/Vite instrumentation
+│   ├── compiler-next/           # Planned Next.js instrumentation
+│   ├── selection-engine/        # Candidate ranking and confidence
+│   ├── source-mapper/           # Identifier and source-map resolution
+│   ├── context-builder/         # DOM, styles, screenshot, a11y, errors
+│   ├── mcp-server/              # External agent tools
+│   ├── provider-codex/          # Codex managed-session adapter
+│   ├── provider-claude/         # Claude managed-session adapter
+│   ├── patch-transaction/       # Baselines, diffs, conflict detection, undo
+│   └── visual-verifier/         # HMR, screenshots, runtime checks
+│
+├── examples/
+│   └── react-vite-demo/
+│
+└── docs/
 ```
 
-Nguoi dung chi cai `@patchlens/dev`. Cac package con duoc giu rieng de de test, version va mo rong framework/provider.
+The developer should install one public package. Internal packages remain separate to keep framework and provider concerns isolated.
 
-## 6. Cac thanh phan cot loi
+## 7. Component responsibilities
 
-### 6.1. Studio
+### 7.1. Studio
 
-Studio la giao dien web chay tren localhost va gom:
+Studio is the local web interface.
 
-- Toolbar chon project, route, viewport va provider.
-- Preview cua dev server nam trong iframe hoac mot browser surface duoc kiem soat.
-- Inspector overlay.
-- Chat neo theo vung chon.
-- Trang thai agent dang suy nghi, dang sua file, dang test.
-- Diff viewer va nut undo.
-- Console errors va ket qua verification.
+Responsibilities:
 
-Studio khong truc tiep sua repository. Moi thao tac lien quan den file hoac agent deu di qua Local Daemon.
+- Display the project's development preview.
+- Switch among named responsive presets without restarting the preview.
+- Rotate tablet and mobile responsive widths.
+- Control Inspector mode.
+- Receive selection messages from the preview.
+- Display selection confidence and source candidates.
+- Position chat near the selected rectangle.
+- Display agent session state and streamed events.
+- Show changed files, source diff, visual result, and undo state.
+- Make every provider-bound context payload inspectable.
 
-### 6.2. Inspector Runtime
+Studio must not read or modify repository files directly. File and agent operations go through the daemon.
 
-Inspector Runtime duoc inject vao preview chi trong development mode.
+#### Responsive preview contract
 
-Nhiem vu:
+The responsive preview is part of the grounding contract, not only a visual convenience.
 
-- Dung `document.elementFromPoint()` de tim element khi hover.
-- Ve highlight ma khong thay doi layout cua website.
-- Ho tro click de chon mot DOM element.
-- Ho tro pointer drag de tao selection rectangle.
-- Tim cac element giao voi rectangle bang `getBoundingClientRect()`.
-- Theo doi scroll, resize va DOM mutation.
-- Gui selection metadata ve Studio.
+- Desktop uses the available Studio width.
+- Tablet starts at `768 px` and can rotate to a `1024 px` responsive width.
+- Mobile starts at `390 px` and can rotate to an `844 px` responsive width.
+- The iframe emits a resize event whenever its responsive width changes.
+- The Inspector recalculates the active rectangle and current viewport dimensions.
+- Studio clamps anchored chat to the resized preview boundary.
+- Agent requests include the named preset, orientation, actual width, actual height, and device scale factor.
+- The active `selectionId` and chat thread remain stable across viewport changes.
 
-Inspector nen dung Shadow DOM hoac mot overlay root doc lap de CSS cua du an khong lam hong UI cua PatchLens.
+The initial implementation models responsive CSS widths. Later device emulation may add custom dimensions, zoom, touch/hover capability, safe-area insets, user-agent profiles, and side-by-side breakpoint comparison. Those capabilities must not falsify the actual dimensions sent to an agent.
 
-### 6.3. Compiler Plugin va Source Manifest
+### 7.2. Inspector Runtime
 
-Day la thanh phan giup PatchLens tu xac dinh component chinh xac.
+The Inspector is injected only into the local development preview.
 
-Trong development build, compiler plugin bien doi JSX/TSX:
+Responsibilities:
+
+- Use `document.elementsFromPoint()` to inspect visible nodes.
+- Draw hover and selection overlays without changing layout.
+- Intercept click selection while selection mode is active.
+- Create a rectangle from pointer drag.
+- Find instrumented nodes intersecting the rectangle.
+- Track selected-element movement during scroll and resize.
+- Send selection data to Studio through an explicit message protocol.
+- Remove sensitive DOM values before context capture.
+
+The overlay should use Shadow DOM or an isolated root so application styles cannot corrupt PatchLens controls.
+
+### 7.3. Compiler plugin
+
+The compiler plugin creates the preferred exact mapping path.
+
+Source:
 
 ```tsx
-<Button>Dang ky</Button>
+<button className="primary-action">Start planning</button>
 ```
 
-thanh metadata tuong duong:
+Development instrumentation:
 
 ```html
-<button data-patchlens-id="pl_a82f">Dang ky</button>
+<button data-patchlens-id="pl_a82f" class="primary-action">
+  Start planning
+</button>
 ```
 
-Dong thoi tao manifest local:
+Local manifest:
 
 ```json
 {
   "pl_a82f": {
-    "component": "PricingCTA",
-    "file": "src/components/PricingCTA.tsx",
-    "line": 42,
-    "column": 8
+    "framework": "react",
+    "componentName": "Hero",
+    "file": "src/components/Hero.tsx",
+    "line": 22,
+    "column": 11,
+    "tagName": "button"
   }
 }
 ```
 
-Yeu cau:
+Requirements:
 
-- ID on dinh trong mot development session.
-- Khong dua duong dan tuyet doi vao DOM.
-- Manifest chi duoc phuc vu tren localhost.
-- Metadata phai bi loai bo khoi production build.
-- Ho tro element duoc render qua wrapper component.
-- Co fallback bang source map va React Fiber khi metadata truc tiep khong du.
+- Run only in the development server.
+- Avoid absolute paths in DOM and HTTP responses.
+- Preserve source lines where practical.
+- Replace stale manifest entries during HMR.
+- Avoid duplicate identifiers when another PatchLens transform already ran.
+- Exclude dependencies and generated files.
+- Provide a migration path to source-map and framework-specific fallbacks.
 
-### 6.4. Selection Engine
+### 7.4. Selection Engine
 
-Selection Engine nhan mot hoac nhieu DOM node va tra ve component candidate.
+The Selection Engine converts one or more DOM nodes into ranked source candidates.
 
-Che do click:
+Click algorithm:
 
-1. Lay element duoi con tro.
-2. Tim `data-patchlens-id` gan nhat.
-3. Resolve qua Source Manifest.
-4. Tra ve component chinh xac.
+1. Get elements at pointer coordinates.
+2. Ignore PatchLens overlay nodes.
+3. Resolve the nearest instrumented ancestor.
+4. Load its manifest entry.
+5. Return the exact rectangle, DOM summary, and source candidate.
 
-Che do keo vung:
+Drag algorithm:
 
-1. Lay tat ca element co rectangle giao voi vung chon.
-2. Loai bo cac element qua nho hoac bi che khuat hoan toan.
-3. Resolve cac `patchlens-id`.
-4. Tim component ancestor chung nho nhat.
-5. Xep hang candidate theo coverage va specificity.
+1. Build a normalized rectangle from pointer start and end.
+2. Collect visible instrumented nodes intersecting the rectangle.
+3. Calculate element coverage and selection coverage.
+4. Remove hidden, zero-size, and duplicate candidates.
+5. Prefer a useful shared component boundary over a tiny child node.
+6. Return the highest-ranked candidate and a bounded alternative list.
 
-Ket qua nen co confidence:
+Confidence levels:
 
 ```ts
 type SelectionConfidence = "exact" | "likely" | "visual-only";
 ```
 
-- `exact`: Co compiler metadata ro rang.
-- `likely`: Suy ra tu source map, Fiber hoac component ancestor.
-- `visual-only`: Chi co screenshot/DOM, agent phai tim code.
+The engine should eventually include an explanation for every score so mapping failures are debuggable.
 
-### 6.5. Anchored Chat
+### 7.5. Selection Context Builder
 
-Chat phai xuat hien gan vung da chon nhung khong duoc lam thay doi DOM layout cua website.
+The context builder combines visual and source information into a bounded provider payload.
 
-De xuat:
+Potential inputs:
 
-- Render chat trong overlay layer cua Studio hoac Shadow DOM.
-- Chuyen toa do iframe sang toa do Studio.
-- Uu tien hien ben duoi selection.
-- Neu khong du cho, chuyen sang ben tren hoac ben canh.
-- Cap nhat vi tri bang `ResizeObserver` va scroll listeners.
-- Mot chat thread co the giu mot hoac nhieu selection lien quan.
+- Visual selection and confidence.
+- Sanitized selected DOM.
+- Selected-region screenshot.
+- Computed styles relevant to layout, typography, color, and state.
+- Accessibility name, role, and state.
+- Current route and viewport.
+- Named viewport preset and orientation when Studio controls the preview.
+- Source candidates and surrounding source excerpts.
+- Related imported components or style files.
+- Existing console and runtime errors.
 
-Moi message phai luu `selectionId` de agent biet ngu canh dang noi den phan nao.
+Context rules:
 
-### 6.6. Local Daemon
+- Limit DOM depth and total payload size.
+- Remove secret-like attributes and form values.
+- Do not send the entire repository automatically.
+- Show the final payload to the developer.
+- Identify which fields leave the local machine.
 
-Daemon la tien trinh Node.js chay tren `127.0.0.1`.
+### 7.6. Anchored Chat
 
-Nhiem vu:
+Chat is visually attached to a selection while remaining isolated from application layout and styles.
 
-- Quan ly project root duoc phep truy cap.
-- Khoi dong hoac ket noi dev server.
-- Luu selection context.
-- Quan ly Codex/Claude sessions.
-- Stream agent events ve Studio.
-- Theo doi file changes.
-- Tao diff va undo transaction.
-- Chay test, lint hoac verification command.
+Positioning rules:
 
-Giao tiep de xuat:
+- Prefer below the selected rectangle.
+- Move above or beside it when space is insufficient.
+- Clamp the panel to the preview boundary.
+- Reposition on scroll, resize, HMR, and responsive changes.
+- Preserve the same thread when the selected element moves.
+- Allow explicit reselection without silently changing thread scope.
 
-- HTTP cho cac request ngan.
-- WebSocket hoac Server-Sent Events cho agent streaming.
-- Session token local de ngan website khac goi daemon.
+Every message stores a `selectionId`. A thread may later support multiple explicitly attached selections.
 
-### 6.7. Agent Session Registry
+### 7.7. Local Daemon
 
-PatchLens chi co the tiep tuc dung phien AI neu no biet chinh xac session do.
+The daemon runs on the local machine and binds to `127.0.0.1` by default.
+
+Responsibilities:
+
+- Manage approved project roots.
+- Read PatchLens project configuration.
+- Detect or launch the development server.
+- Store selection contexts.
+- Manage provider sessions.
+- Stream provider events to Studio.
+- Track file changes and patch transactions.
+- Run configured verification commands.
+- Coordinate HMR and visual verification.
+- Persist recoverable local state.
+
+Suggested communication:
+
+- HTTP for health, configuration, and short requests.
+- Server-Sent Events or WebSocket for provider streaming.
+- Local session token for Studio authentication.
+- Separate authenticated channel for MCP.
+
+### 7.8. Agent Session Registry
+
+PatchLens must know which project, provider, selection, and provider session belong together.
 
 ```ts
 type AgentSession = {
   id: string;
   projectId: string;
-  provider: "codex" | "claude";
-  providerSessionId: string;
+  provider: "mock" | "codex" | "claude" | string;
+  providerSessionId?: string;
   status: "idle" | "running" | "waiting" | "failed";
   activeSelectionId?: string;
   createdAt: string;
 };
 ```
 
-Co hai che do:
+Managed sessions are owned by PatchLens. Attached sessions are owned by an external agent and communicate through an explicitly installed bridge.
 
-#### Managed session
+PatchLens must not claim it can automatically control an arbitrary external conversation without a supported provider capability and user authorization.
 
-PatchLens khoi tao va so huu agent session. Chat trong Studio gui message truc tiep vao cung session. Day la che do de dat muc tieu tu dong hoa day du.
+### 7.9. Provider Adapter
 
-#### Attached session
-
-Nguoi dung dang dung Codex/Claude o mot ung dung khac. Coding agent duoc cai MCP/skill de goi PatchLens va lay active selection.
-
-Khong nen hua rang mot trang web co the tu dong chiem quyen moi cuoc chat Codex/Claude dang mo. Viec gui message vao session ben ngoai chi duoc lam khi provider co bridge duoc ho tro va nguoi dung da cap quyen.
-
-### 6.8. Provider Adapter
-
-Studio va Daemon chi giao tiep qua mot interface chung:
+Studio and daemon should depend on one provider-independent interface.
 
 ```ts
 export interface CodingProvider {
-  id: "codex" | "claude" | string;
-
+  id: string;
   detect(): Promise<ProviderStatus>;
-
   createSession(input: CreateSessionInput): Promise<AgentSessionHandle>;
-
   sendMessage(
     session: AgentSessionHandle,
-    message: AgentRequest
+    request: AgentRequest
   ): AsyncIterable<AgentEvent>;
-
   cancel(session: AgentSessionHandle): Promise<void>;
-
   dispose(session: AgentSessionHandle): Promise<void>;
 }
 ```
 
-Adapter khong duoc dua thong tin provider-specific vao Inspector hoac Studio protocol.
+Provider adapters own:
 
-### 6.9. MCP Server
+- Availability detection.
+- Authentication-state reporting.
+- Session creation and continuation.
+- Provider-specific event translation.
+- Cancellation and cleanup.
+- Provider error normalization.
 
-MCP la bridge de Codex, Claude hoac agent ben ngoai truy cap selection hien tai.
+Provider-specific fields must not leak into the selection protocol.
 
-Tool de xuat:
+### 7.10. MCP Server
+
+MCP enables explicitly configured external coding agents to retrieve PatchLens context.
+
+Initial tool surface:
 
 ```text
 patchlens.get_active_selection
 patchlens.get_selection_context
 patchlens.get_source_context
-patchlens.capture_preview
 patchlens.get_console_errors
+patchlens.capture_preview
 patchlens.verify_visual_change
 ```
 
-Agent co the nhan prompt nhu:
+Requirements:
 
-```text
-Sua vung giao dien toi dang chon: lam nut chinh noi bat hon.
-```
+- Authenticate with the daemon.
+- Restrict all source access to the approved project root.
+- Keep tool responses bounded.
+- Avoid embedding secrets in configuration.
+- Install and remove configuration without overwriting unrelated user settings.
 
-Sau do agent goi `patchlens.get_active_selection` de lay dung component thay vi doan tu mo ta.
+### 7.11. Patch Transaction
 
-### 6.10. Patch Transaction va Undo
-
-Tu dong sua code phai di kem kha nang khoi phuc an toan.
-
-Moi request tao mot transaction:
+Automatic editing requires a transaction boundary.
 
 ```ts
 type PatchTransaction = {
@@ -341,20 +414,37 @@ type PatchTransaction = {
   filesBefore: FileSnapshot[];
   filesAfter: FileSnapshot[];
   diff: string;
+  scopeExpansion: string[];
   status: "running" | "applied" | "reverted" | "failed";
 };
 ```
 
-Yeu cau an toan:
+Safety requirements:
 
-- Chi undo cac thay doi thuoc transaction cua agent.
-- Khong dung `git reset --hard`.
-- Khong ghi de thay doi nguoi dung tao sau khi transaction bat dau.
-- Canh bao neu agent mo rong pham vi ra ngoai component/file du kien.
+- Capture the baseline before the provider begins editing.
+- Detect changes made concurrently by the developer.
+- Associate only agent-owned changes with undo.
+- Do not use destructive whole-worktree reset operations.
+- Report edits outside expected source candidates.
+- Prevent writes outside the approved root.
+- Preserve diagnostic information for interrupted transactions.
 
-## 7. Data contract chinh
+### 7.12. Visual Verifier
 
-### 7.1. Source location
+Verification should answer:
+
+- Did the development server remain available?
+- Did HMR complete?
+- Does the selected component still exist?
+- Were new runtime or console errors introduced?
+- What changed visually inside the selected region?
+- Which configured tests or checks passed?
+
+Verification output belongs to the same transaction and conversation thread.
+
+## 8. Core data contracts
+
+### Source location
 
 ```ts
 export type SourceLocation = {
@@ -364,77 +454,76 @@ export type SourceLocation = {
   file: string;
   line: number;
   column: number;
+  tagName?: string;
 };
 ```
 
-### 7.2. Visual selection
+### Visual selection
 
 ```ts
 export type VisualSelection = {
   id: string;
-  projectId: string;
   route: string;
-  viewport: {
-    width: number;
-    height: number;
-    deviceScaleFactor: number;
-  };
-  rectangle: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  elementIds: string[];
-  sourceCandidates: Array<{
-    location: SourceLocation;
-    confidence: number;
-  }>;
+  viewport: Viewport;
+  rectangle: Rectangle;
+  elements: SelectedElement[];
+  primaryElement: SelectedElement;
   confidence: SelectionConfidence;
+  createdAt: string;
 };
 ```
 
-### 7.3. Selection context
+The viewport carried by `VisualSelection` is:
+
+```ts
+export type Viewport = {
+  width: number;
+  height: number;
+  deviceScaleFactor: number;
+  preset?: "desktop" | "tablet" | "mobile" | "custom";
+  orientation?: "portrait" | "landscape";
+};
+```
+
+Width and height are authoritative. Preset and orientation are descriptive context added by Studio and must not replace the measured iframe dimensions.
+
+### Selection context
 
 ```ts
 export type SelectionContext = {
   selection: VisualSelection;
-  screenshotPath?: string;
   sanitizedHtml: string;
   computedStyles: Record<string, string>;
   accessibilitySummary?: string;
-  relatedSourceFiles: Array<{
-    path: string;
-    startLine: number;
-    endLine: number;
-  }>;
+  screenshotReference?: string;
+  relatedSourceFiles: SourceExcerpt[];
   consoleErrors: string[];
 };
 ```
 
-### 7.4. Agent request
+### Agent request
 
 ```ts
 export type AgentRequest = {
-  sessionId: string;
-  selectionId: string;
+  sessionId?: string;
+  provider: string;
   instruction: string;
+  selection: VisualSelection;
   context: SelectionContext;
   scopePolicy: "prefer-selection" | "strict" | "allow-related";
   verification: {
     route: string;
     captureAfterChange: boolean;
+    commands: string[];
   };
 };
 ```
 
-`prefer-selection` nen la mac dinh. `strict` co the lam agent khong sua duoc CSS dung chung hoac parent component can thiet.
-
-## 8. Vong doi cua mot yeu cau
+## 9. Request lifecycle
 
 ```mermaid
 sequenceDiagram
-    participant U as User
+    participant U as Developer
     participant S as Studio
     participant I as Inspector
     participant D as Daemon
@@ -442,208 +531,210 @@ sequenceDiagram
     participant R as Repository
     participant V as Dev Server
 
-    U->>I: Keo chon mot vung
-    I->>S: Selection IDs + rectangle
-    S->>D: Tao Selection Context
-    D-->>S: Component/file/source context
-    S-->>U: Hien chat gan vung chon
-    U->>S: Gui yeu cau sua
-    S->>D: Message + sessionId + selectionId
-    D->>A: Prompt + source + DOM + screenshot
-    A->>R: Sua file
-    R->>V: File changed
-    V-->>S: HMR cap nhat preview
-    D->>D: Tao diff va verification
-    D-->>S: Agent result + diff + undo token
-    S-->>U: Hien ket qua
+    U->>I: Click or drag a visual region
+    I->>S: Selection IDs, rectangle, DOM summary
+    S->>D: Build or request complete selection context
+    D-->>S: Source candidates and bounded context
+    S-->>U: Display anchored chat
+    U->>S: Send requested change
+    S->>D: Session ID + selection ID + instruction
+    D->>D: Create patch transaction baseline
+    D->>A: Structured agent request
+    A->>R: Edit repository files
+    R->>V: File changes trigger HMR
+    V-->>D: Preview state and runtime result
+    D->>D: Build diff and verification report
+    D-->>S: Agent result + transaction + undo token
+    S-->>U: Show visual result and code changes
 ```
 
-## 9. Cau truc prompt gui agent
+## 10. Agent prompt construction
 
-Prompt nen duoc tao co cau truc, khong chi ghep mot doan text dai.
+Provider adapters should receive structured fields. If a text prompt must be generated, it should preserve clear sections.
 
 ```text
-Project root: <project-root>
-Route: /pricing
+Project
+- Approved root: <project-root>
+- Route: /pricing
+- Viewport: 1440 x 900
 
-User request:
-"Doi nut nay sang mau cam va lam no nho hon."
+Developer request
+"Make the primary CTA warmer and reduce its horizontal padding."
 
-Selected component:
-- Name: PricingCTA
-- File: src/components/PricingCTA.tsx
+Selected source
+- Component: HeroCTA
+- File: src/components/HeroCTA.tsx
 - Line: 42
 - Confidence: exact
 
-Visual context:
+Visual context
 - Rectangle: x, y, width, height
-- Screenshot: <local-reference>
-- DOM: <sanitized-dom>
-- Computed styles: <selected-styles>
+- Screenshot: <local reference>
+- DOM: <sanitized subtree>
+- Computed styles: <bounded style set>
 
-Scope policy:
-- Uu tien chi sua selected component va style lien quan.
-- Neu can sua file dung chung, bao cao scope expansion.
-- Khong thay doi phan khong lien quan.
+Scope policy
+- Prefer the selected component and directly related styles.
+- Report meaningful scope expansion before changing shared files.
+- Do not modify unrelated page regions.
 
-Verification:
-- Mo lai route /pricing.
-- Xac nhan component van render.
-- Bao cao file da thay doi va test da chay.
+Verification
+- Reload /pricing.
+- Confirm the selected component renders.
+- Report new console errors.
+- Report changed files and commands executed.
 ```
 
-## 10. Bao mat va rieng tu
+## 11. Security and privacy
 
-- Daemon chi bind vao `127.0.0.1` theo mac dinh.
-- Moi Studio session co local authentication token.
-- Project root phai duoc nguoi dung chon hoac phe duyet.
-- Loai bo password, token va gia tri input nhay cam khoi DOM capture.
-- Khong gui toan bo trang neu selection context da du.
-- Hien ro provider nao se nhan screenshot va source code.
-- Khong luu API key trong `.patchlens/config.json`.
-- Dung credential/session do Codex hoac Claude tu quan ly khi co the.
-- Log phai redact duong dan va secret neu duoc export.
+- Bind the daemon to localhost by default.
+- Require a local authentication token for Studio and MCP clients.
+- Require explicit project-root approval.
+- Reject resolved paths outside the approved root.
+- Remove secret-like DOM attributes and form values.
+- Limit screenshot capture to requested regions whenever possible.
+- Show which provider receives source or visual context.
+- Keep provider credentials under provider control when possible.
+- Never store API keys in `.patchlens/config.json`.
+- Redact secrets and private paths from exported diagnostics.
+- Make telemetry opt-in and privacy-preserving.
 
-## 11. Stack ky thuat de xuat
+## 12. Proposed technical stack
 
-Day la lua chon ban dau, co the thay doi sau spike:
-
-- Ngon ngu: TypeScript.
+- Language: TypeScript.
 - Package manager: pnpm workspaces.
 - Studio: React + Vite.
-- Daemon: Node.js voi mot HTTP framework nhe.
-- Streaming: WebSocket hoac Server-Sent Events.
-- Schema validation: Zod hoac JSON Schema.
-- Inspector: Vanilla TypeScript de giam dependency tren app nguoi dung.
-- Build instrumentation: Babel/SWC/Vite transform tuy framework.
-- Test: Vitest cho package, Playwright cho end-to-end visual flow.
-- Session storage MVP: in-memory + file state local.
-- Session storage ve sau: SQLite neu can resume va history ben vung.
+- Daemon: Node.js with a minimal HTTP layer.
+- Streaming: Server-Sent Events or WebSocket.
+- Schema validation: Zod or JSON Schema.
+- Inspector: dependency-light browser TypeScript.
+- Instrumentation: TypeScript AST for the first Vite prototype, with later Babel/SWC evaluation.
+- Unit tests: Vitest or Node test runner where practical.
+- Browser tests: Playwright.
+- Initial local state: memory plus explicit files.
+- Durable session state: SQLite when resume and history are required.
 
-## 12. Ke hoach trien khai
+## 13. Testing strategy
 
-### Phase 0 - Scaffold
+### Unit tests
 
-- Tao pnpm monorepo.
-- Cau hinh TypeScript, lint, format va test.
-- Tao `react-vite-demo`.
-- Dinh nghia `agent-protocol` va schema co ban.
+- Identifier generation.
+- Source manifest replacement during HMR.
+- Rectangle intersection and ranking.
+- DOM sanitization.
+- Context payload limits.
+- Path authorization.
+- Transaction diff and undo logic.
+- Provider event normalization.
 
-### Phase 1 - Inspector va source mapping
+### Integration tests
 
-- Tao Vite plugin inject `data-patchlens-id`.
-- Tao Source Manifest.
-- Hover highlight.
-- Click selection.
-- Drag rectangle selection.
-- Selection confidence va component candidates.
+- Vite plugin plus React fixture.
+- Studio-to-iframe messaging.
+- Selection-context creation.
+- Daemon session continuation.
+- Provider adapter with a deterministic mock.
+- Patch transaction in a dirty repository fixture.
 
-Ket qua can dat:
+### End-to-end tests
+
+- Start Studio, daemon, and demo.
+- Click and drag selections.
+- Send contextual chat messages.
+- Apply a deterministic mock file edit.
+- Wait for HMR.
+- Verify changed UI and diff.
+- Undo the transaction.
+- Repeat at desktop and mobile widths.
+- Rotate tablet and mobile modes while a selection is active and confirm the same thread receives updated viewport metadata.
+- Verify the requested breakpoint first, then optionally capture regression results for the other presets.
+
+## 14. Delivery sequence
+
+The complete ordered plan lives in [`docs/NEXT_STEPS.md`](./docs/NEXT_STEPS.md).
+
+Recommended high-level order:
 
 ```text
-Nguoi dung click/drag tren demo
--> UI hien dung component name
--> UI hien dung file va dong code
+Verify current prototype
+  → strengthen source resolution
+  → complete context capture
+  → implement patch transactions
+  → integrate Codex managed sessions
+  → add live visual verification
+  → add Codex MCP attached mode
+  → add Claude and Next.js
+  → add external-page support and publish packages
 ```
 
-### Phase 2 - Studio va anchored chat
+Patch transactions must be complete before autonomous provider editing. Codex should stabilize before adding a second managed provider.
 
-- Tao Studio shell.
-- Embed preview.
-- Chuyen toa do selection tu iframe sang Studio.
-- Hien chat gan vung chon.
-- Luu selection thread.
-- Tao mock agent de test streaming.
+## 15. Definition of the first usable MVP
 
-### Phase 3 - Daemon va Codex managed session
+The first usable MVP is complete when:
 
-- Tao local daemon.
-- Project permission va session token.
-- Provider interface.
-- Codex adapter spike.
-- Stream message va agent events.
-- Theo doi file change va HMR.
-- Tao diff va undo transaction.
+- A React + Vite repository can install PatchLens through a documented command flow.
+- Studio displays a live local preview.
+- Studio can target desktop, tablet, and mobile responsive widths without losing the active selection.
+- Click and drag selections produce useful source candidates.
+- The selection thread keeps its visual context across follow-up messages.
+- Codex receives structured visual and source context.
+- Codex edits the intended project inside an approved root.
+- Every request creates a reviewable patch transaction.
+- HMR updates the preview after the edit.
+- PatchLens reports runtime failures and changed files.
+- Undo restores only agent-owned changes.
+- Production builds contain no PatchLens instrumentation.
 
-Luu y: Truoc khi code adapter, can xac minh be mat tich hop Codex chinh thuc duoc ho tro trong moi truong muc tieu. Khong hard-code vao mot CLI output khong on dinh.
+## 16. Main technical risks
 
-### Phase 4 - MCP attached session
+### DOM and component boundaries do not match
 
-- Tao MCP server.
-- Expose active selection tools.
-- Tao installer `patchlens connect codex`.
-- Tao skill/plugin huong dan Codex su dung selection context.
-- Them `patchlens doctor` va `patchlens disconnect`.
+React components may render fragments, portals, wrappers, shared primitives, or several roots. PatchLens must combine compiler metadata with ranked fallbacks and must expose uncertainty.
 
-### Phase 5 - Claude va Next.js
+### Styling may live outside the selected file
 
-- Claude provider adapter.
-- Claude MCP installer.
-- Next.js compiler integration.
-- Ho tro route va server/client component boundaries.
+The visual result may depend on global CSS, design tokens, shared components, or parent layout. A strict single-file scope can prevent correct fixes, so scope expansion must be visible and controlled.
 
-### Phase 6 - Visual verification
+### External sessions may not be controllable
 
-- Chup selected region truoc/sau.
-- Kiem tra component con ton tai sau HMR.
-- Phat hien runtime/console error moi.
-- Hien before/after va diff trong Studio.
+Provider capabilities differ. Managed sessions are the primary path. Attached mode requires an explicit supported bridge such as MCP.
 
-## 13. Tieu chi hoan thanh MVP
+### Cross-origin previews block DOM inspection
 
-MVP duoc xem la dat khi:
+The first release should support injected local development previews. External pages require an extension or controlled proxy with explicit permissions.
 
-- Cai duoc vao mot React + Vite repo bang mot command flow ro rang.
-- `npm run patchlens` mo Studio va preview.
-- Click chon element tra ve dung file/dong code trong phan lon demo cases.
-- Keo vung tra ve component candidate hop ly.
-- Chat hien gan selection va giu dung selection thread.
-- Codex managed session nhan duoc source context.
-- Agent tu sua file va preview cap nhat qua HMR.
-- Studio hien cac file da thay doi.
-- Undo chi hoan tac thay doi cua agent.
-- Khong co PatchLens runtime trong production build.
+### Developer changes may race with agent changes
 
-## 14. Rui ro ky thuat chinh
+Patch transactions must detect concurrent edits and avoid overwriting work created after the transaction baseline.
 
-### DOM khong tuong ung 1-1 voi component
+### Context can become too large
 
-Mot component co the render Fragment, Portal, wrapper hoac nhieu DOM root. Can compiler metadata ket hop React Fiber/source map fallback.
+DOM, styles, screenshots, and source excerpts need strict limits and prioritization so provider requests remain fast, safe, and understandable.
 
-### CSS den tu noi khac
+## 17. Open research questions
 
-Style co the nam trong global CSS, Tailwind config, theme token hoac parent component. Vi vay scope mac dinh nen la `prefer-selection`, khong phai khoa tuyet doi mot file.
+- Should long-term React instrumentation use TypeScript AST, Babel, or SWC?
+- How should component boundaries be represented for fragments and multiple roots?
+- Which official Codex surface supports managed session creation and continuation?
+- Which agent events can be normalized reliably across Codex and Claude?
+- Should anchored chat live in the Studio parent layer or preview Shadow DOM?
+- Which computed-style subset provides the best value-to-payload ratio?
+- Should transaction state use file snapshots, reverse patches, or a hybrid?
+- What confidence threshold should trigger user candidate selection?
+- How should selection identity survive large HMR-driven DOM replacement?
+- How should selection identity survive responsive conditional rendering that replaces the selected DOM subtree?
+- Should advanced device emulation use iframe sizing, browser automation contexts, or a hybrid?
+- How should side-by-side breakpoint comparison share one intent without creating conflicting agent threads?
 
-### External AI session
+## 18. Immediate engineering tasks
 
-Khong phai provider nao cung cho phep mot website gui message vao cuoc chat dang mo. Managed session la con duong chinh; MCP attached mode la con duong phu.
-
-### Cross-origin preview
-
-Iframe khac origin khong cho Inspector doc DOM. MVP chi nen ho tro local dev server duoc inject. Website ben ngoai can browser extension hoac reverse proxy o giai doan sau.
-
-### Bao ve thay doi nguoi dung
-
-Repository co the dang dirty. Patch transaction phai ghi nhan baseline va tranh ghi de thay doi phat sinh dong thoi.
-
-## 15. Cac cau hoi can spike
-
-- Vite transform nao cho source metadata on dinh nhat: Babel, SWC hay plugin AST rieng?
-- Cach map function component va DOM root khi component tra ve Fragment?
-- Codex managed session co the duoc khoi tao, tiep tuc va stream bang be mat chinh thuc nao?
-- Claude managed session se dung CLI bridge hay API adapter?
-- Chat nen render o parent Studio hay trong iframe Shadow DOM?
-- Undo nen dung file snapshot, reverse patch hay temporary worktree?
-- Muc du lieu computed styles toi thieu nao la du cho agent?
-
-## 16. Cong viec tiep theo de bat dau code
-
-1. Khoi tao Git va pnpm workspace.
-2. Tao `apps/studio`, `apps/daemon` va `examples/react-vite-demo`.
-3. Dinh nghia protocol types trong `packages/agent-protocol`.
-4. Lam spike Vite plugin inject `data-patchlens-id`.
-5. Tao hover/click inspector proof of concept.
-6. Them drag rectangle va component candidate resolver.
-7. Tao anchored chat voi mock agent.
-8. Sau khi luong visual-to-code on dinh moi bat dau Codex adapter.
-
+1. Install dependencies in a network-enabled environment.
+2. Run typecheck and build across all workspace packages.
+3. Start Studio, daemon, and demo.
+4. Verify Desktop, Tablet, Mobile, rotation, and anchored-chat behavior in the first browser run.
+5. Fix any source-manifest, iframe-selection, or responsive synchronization issues found during verification.
+6. Add automated tests for Vite instrumentation and selection ranking.
+7. Extract context sanitization and ranking into dedicated packages.
+8. Implement a deterministic mock file editor through patch transactions.
+9. Begin the Codex managed-session integration spike only after transaction undo is proven.

@@ -7,10 +7,15 @@ export type Rectangle = {
   height: number;
 };
 
+export type ViewportPreset = "desktop" | "tablet" | "mobile" | "custom";
+export type ViewportOrientation = "portrait" | "landscape";
+
 export type Viewport = {
   width: number;
   height: number;
   deviceScaleFactor: number;
+  preset?: ViewportPreset;
+  orientation?: ViewportOrientation;
 };
 
 export type SourceLocation = {

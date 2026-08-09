@@ -2,11 +2,11 @@
 
 # 🎯 PatchLens AI
 
-### Select the interface. Tell the AI. Ship the patch.
+### Select the interface. Tell the agent. Ship the patch.
 
-**Visual AI coding for web interfaces**
+**A visual context layer for AI coding agents.**
 
-PatchLens AI giúp lập trình viên chọn trực tiếp một vùng trên giao diện web, mở cuộc trò chuyện ngay tại vị trí đó và yêu cầu coding agent sửa đúng component trong source code.
+PatchLens AI lets developers select an element or region inside a live web preview, open a conversation at that exact location, and ask Codex, Claude, or another coding agent to edit the corresponding source code.
 
 ![Status](https://img.shields.io/badge/status-early_development-E85D2A?style=for-the-badge)
 ![Runtime](https://img.shields.io/badge/runtime-Node.js-236D4A?style=for-the-badge&logo=node.js&logoColor=white)
@@ -17,43 +17,46 @@ PatchLens AI giúp lập trình viên chọn trực tiếp một vùng trên gia
 
 ---
 
-## PatchLens AI là gì?
+## Why PatchLens AI exists
 
-Khi làm giao diện bằng AI, vấn đề thường không phải AI không biết viết code. Vấn đề là AI **không biết chính xác phần nào trên màn hình mà người dùng đang muốn thay đổi**.
+AI coding tools are already capable of writing frontend code. The difficult part is often giving them the correct visual target.
 
-Người dùng có thể nói:
+A developer may say:
 
-> Làm nút này nổi bật hơn.
+> Make this button warmer, reduce the spacing above it, and leave the rest of the page unchanged.
 
-Nhưng coding agent vẫn phải tự đoán:
+The agent still has to determine:
 
-- "Nút này" là element nào?
-- Nó nằm trong component nào?
-- File nào đang render component đó?
-- Style đến từ CSS module, Tailwind, theme token hay component cha?
-- Có được phép sửa những phần liên quan bên ngoài vùng chọn hay không?
+- Which visible button does "this button" refer to?
+- Which component renders it?
+- Which file and source location own that component?
+- Does its styling come from local CSS, a design token, a shared component, or a parent layout?
+- Is the agent allowed to update related files outside the selected component?
+- How can the developer verify that the requested visual change happened without causing a regression?
 
-PatchLens AI giải quyết khoảng cách giữa **thứ người dùng đang nhìn thấy** và **code mà AI cần chỉnh sửa**.
+PatchLens AI is designed to close the gap between **what the developer is looking at** and **what the coding agent needs to edit**.
 
 ```text
-Nhìn thấy giao diện
-        ↓
-Click hoặc kéo chọn một vùng
-        ↓
-PatchLens tìm component + file + dòng code
-        ↓
-Chat xuất hiện cạnh vùng đã chọn
-        ↓
-Codex / Claude nhận đúng visual context
-        ↓
-AI tự sửa repository
-        ↓
-HMR cập nhật giao diện và PatchLens hiển thị diff
+Visible interface
+      ↓
+Click or drag to select a region
+      ↓
+Resolve component + file + source location
+      ↓
+Open a chat attached to that selection
+      ↓
+Send visual and source context to the coding agent
+      ↓
+Let the agent edit the repository
+      ↓
+Reload through HMR, verify the result, show the diff, and support undo
 ```
 
-## Trải nghiệm sản phẩm mong muốn
+## Product vision
 
-PatchLens AI được thiết kế như một development tool cài trực tiếp vào dự án Node.js.
+PatchLens AI should feel like a development dependency rather than a separate website builder.
+
+The target installation experience is:
 
 ```bash
 npm install --save-dev @patchlens-ai/dev
@@ -63,67 +66,73 @@ npm run patchlens
 ```
 
 > [!IMPORTANT]
-> Các command trên là **trải nghiệm cài đặt mục tiêu**. Repository hiện đang ở giai đoạn đầu và package chưa được phát hành.
+> These commands describe the intended developer experience. The repository is still in early development and the package has not been published.
 
-Sau khi PatchLens Studio mở:
+Once PatchLens Studio is running, the intended workflow is:
 
-1. Dự án web được hiển thị trong một live preview.
-2. Người dùng bật chế độ chọn giao diện.
-3. Hover để xem element và component tương ứng.
-4. Click để chọn chính xác một element hoặc kéo chuột để chọn một nhóm element.
-5. Một khung chat xuất hiện ngay dưới hoặc bên cạnh vùng đã chọn.
-6. Người dùng mô tả thay đổi bằng ngôn ngữ tự nhiên.
-7. PatchLens gửi visual context và source context đến coding agent đang kết nối.
-8. Agent tự sửa file trong repository.
-9. Dev server HMR cập nhật preview.
-10. PatchLens hiển thị kết quả, diff, verification và tùy chọn undo.
+1. Open the application inside a live development preview.
+2. Choose Desktop, Tablet, or Mobile and rotate Tablet/Mobile when needed.
+3. Enable selection mode.
+4. Hover to inspect the DOM element and source component under the pointer.
+5. Click a single element or drag across a group of elements.
+6. Let PatchLens resolve the selection to component, file, line, and related context.
+7. Display a chat directly below or beside the selected region.
+8. Send the request and active responsive viewport to the coding-agent session.
+9. Allow the agent to edit the repository automatically.
+10. Refresh the preview through the existing development server and HMR.
+11. Show the changed files, verification status, and a safe undo action.
+12. Continue the conversation without losing the original visual selection.
 
-## Luồng tương tác cốt lõi
+## Core interaction loop
 
 ```mermaid
 flowchart LR
-    A["Chọn vùng UI"] --> B["Xác định component"]
-    B --> C["Chat theo selection"]
-    C --> D["Coding agent session"]
-    D --> E["Sửa source code"]
-    E --> F["HMR cập nhật preview"]
+    A["Select UI region"] --> B["Resolve source component"]
+    B --> C["Open contextual chat"]
+    C --> D["Send to coding-agent session"]
+    D --> E["Edit repository files"]
+    E --> F["Refresh through HMR"]
     F --> G["Diff + Verify + Undo"]
     G --> C
 ```
 
-Mỗi vòng chat tiếp theo vẫn giữ liên kết với selection ban đầu. Người dùng không cần giải thích lại component hoặc gửi thủ công tên file cho AI.
+The selection is not merely an attachment to the first message. It remains part of the conversation thread so follow-up requests can continue to target the same component.
 
-## Điều làm PatchLens khác biệt
+## Responsive preview workflow
 
-### Không chỉ gửi screenshot
+Frontend intent is often breakpoint-specific. "Fix this card" can mean one change on desktop and a different change on mobile, so the active viewport must be part of the selection context rather than an unrelated browser setting.
 
-Screenshot giúp AI hiểu giao diện, nhưng không đủ để xác định source code. PatchLens tạo một **Selection Context** gồm:
+The current Studio prototype provides:
 
-- Ảnh chụp riêng vùng được chọn.
-- DOM subtree đã được làm sạch.
-- Bounding rectangle và viewport.
-- Computed styles quan trọng.
-- Route đang mở.
-- Component name.
-- File, line và column trong source code.
-- Những file style hoặc component liên quan.
-- Console errors xuất hiện trước và sau thay đổi.
+| Mode | Portrait/default width | Rotated width | Intended use |
+| --- | ---: | ---: | --- |
+| Desktop | Fluid | — | Work with the available web workspace width. |
+| Tablet | `768 px` | `1024 px` | Inspect tablet breakpoints in portrait and landscape-style widths. |
+| Mobile | `390 px` | `844 px` | Inspect phone layouts in portrait and landscape-style widths. |
 
-### Không bắt AI đoán component
+When the preview width changes, the Inspector republishes the selected element rectangle and current iframe dimensions. Studio then repositions the anchored chat and sends the responsive preset, orientation, width, height, and device scale factor with the agent request. The selection ID remains stable, so changing viewport does not silently create a different conversation.
 
-Trong development build, PatchLens compiler plugin gắn metadata vào JSX/TSX:
+The first prototype is a responsive-width preview, not a complete hardware emulator. Custom width and height fields, saved device presets, zoom/device scaling, touch and hover emulation, and side-by-side breakpoint comparison are planned after the core selection and patch-transaction flow is stable.
+
+## How visual-to-code mapping works
+
+### Development-time instrumentation
+
+During development, the PatchLens compiler plugin instruments JSX and TSX elements with a local identifier.
+
+Source code:
 
 ```tsx
-<button>Start now</button>
+<button>Start planning</button>
 ```
 
-Được instrument thành metadata tương đương:
+Development output:
 
 ```html
-<button data-patchlens-id="pl_a82f">Start now</button>
+<button data-patchlens-id="pl_a82f">Start planning</button>
 ```
 
-ID được ánh xạ trong local source manifest:
+The identifier is resolved through a local source manifest:
 
 ```json
 {
@@ -136,49 +145,94 @@ ID được ánh xạ trong local source manifest:
 }
 ```
 
-Metadata chỉ tồn tại trong development mode và không được đưa vào production build.
+Instrumentation requirements:
 
-### Không phụ thuộc một AI duy nhất
+- It must run only in development mode.
+- It must not expose absolute machine paths in the DOM.
+- It must not be included in production builds.
+- It should preserve the original source line whenever possible.
+- It must support fallbacks for fragments, wrappers, portals, and components with multiple DOM roots.
 
-PatchLens sử dụng một agent protocol chung. Studio và Inspector không cần biết agent bên dưới là Codex, Claude hay một provider khác.
+### Click selection
+
+For a click selection, PatchLens:
+
+1. Finds the visible element under the pointer.
+2. Resolves the nearest `data-patchlens-id`.
+3. Looks up the source manifest entry.
+4. Returns the component, file, line, column, DOM, text, and rectangle.
+
+### Drag selection
+
+For a drag selection, PatchLens:
+
+1. Creates a rectangle from the pointer movement.
+2. Collects instrumented DOM nodes intersecting that rectangle.
+3. Scores candidates by element coverage and selection coverage.
+4. Finds the most specific useful component or common component boundary.
+5. Returns multiple candidates when the selection is ambiguous.
+
+Every result includes a confidence level:
 
 ```ts
-interface CodingProvider {
-  detect(): Promise<ProviderStatus>;
-  createSession(input: CreateSessionInput): Promise<AgentSession>;
-  sendMessage(
-    session: AgentSession,
-    request: AgentRequest
-  ): AsyncIterable<AgentEvent>;
-  cancel(session: AgentSession): Promise<void>;
-}
+type SelectionConfidence = "exact" | "likely" | "visual-only";
 ```
 
-Provider-specific logic được đặt trong adapter riêng:
+- `exact`: the compiler metadata identifies the source directly.
+- `likely`: the source is inferred from related metadata, source maps, or framework internals.
+- `visual-only`: PatchLens has visual and DOM context, but the agent must locate the source.
 
-- `provider-codex`
-- `provider-claude`
-- Các provider khác trong tương lai
+## The selection context sent to an agent
 
-## Hai chế độ kết nối coding agent
+PatchLens should never send only a screenshot and expect the agent to guess the code.
 
-### 1. Managed session
+A selection context may include:
 
-PatchLens tự khởi tạo và quản lý coding agent session.
+- A screenshot cropped to the selected region.
+- Sanitized HTML for the selected DOM subtree.
+- Selected rectangle and viewport dimensions.
+- Important computed styles.
+- Accessibility information.
+- Current route and responsive viewport.
+- Component name and source candidates.
+- File, line, and column when available.
+- Related component or style files.
+- Console errors captured before and after the change.
+- A scope policy describing how far the agent may expand its edits.
+
+```ts
+type AgentRequest = {
+  sessionId: string;
+  instruction: string;
+  selection: VisualSelection;
+  context: SelectionContext;
+  scopePolicy: "prefer-selection" | "strict" | "allow-related";
+};
+```
+
+`prefer-selection` is the intended default. A strict single-file boundary can prevent legitimate fixes when styles or design tokens live in shared files.
+
+## Agent connection modes
+
+### Managed session
+
+PatchLens creates and owns the coding-agent session.
 
 ```text
 PatchLens Studio
-    → tạo Codex/Claude session
-    → lưu provider session ID
-    → gửi mọi chat tiếp theo vào cùng session
-    → stream trạng thái và kết quả về Studio
+    → creates a Codex or Claude session
+    → stores the provider session ID
+    → sends every contextual message to the same session
+    → streams status, messages, file changes, and results back to Studio
 ```
 
-Đây là chế độ chính để đạt trải nghiệm tự động hoàn chỉnh.
+Managed sessions provide the most complete automatic experience because PatchLens knows exactly which project, selection, and agent session belong together.
 
-### 2. Attached session qua MCP
+### Attached session through MCP
 
-Người dùng vẫn làm việc trong Codex hoặc Claude ở bên ngoài PatchLens. Coding agent được kết nối với PatchLens MCP server và có thể gọi các tool:
+The developer continues working in an external Codex or Claude interface. The external agent connects to the PatchLens MCP server and requests the active selection when needed.
+
+Planned MCP tools include:
 
 ```text
 patchlens.get_active_selection
@@ -189,17 +243,17 @@ patchlens.get_console_errors
 patchlens.verify_visual_change
 ```
 
-Sau khi chọn một component trên preview, người dùng có thể nói với agent:
+The developer can then tell the external agent:
 
-> Sửa vùng giao diện tôi đang chọn: làm CTA nổi bật hơn và giảm khoảng cách phía trên.
+> Update the UI region I currently have selected. Make the primary CTA more prominent without changing the secondary action.
 
-Agent lấy active selection từ PatchLens thay vì yêu cầu người dùng mô tả lại vị trí.
+The agent retrieves the selection instead of asking the developer to repeat the file name or DOM location.
 
-## Kiến trúc hệ thống
+## System architecture
 
 ```mermaid
 flowchart TD
-    User["Người dùng click hoặc kéo vùng"] --> Inspector["Inspector Runtime"]
+    User["Developer clicks or drags a region"] --> Inspector["Inspector Runtime"]
     Compiler["Vite / Next Compiler Plugin"] --> Manifest["Source Manifest"]
     Inspector --> Selection["Selection Engine"]
     Manifest --> Selection
@@ -212,49 +266,48 @@ flowchart TD
     Adapter --> Claude["Claude"]
     Codex --> Files["Repository Files"]
     Claude --> Files
-    Files --> HMR["Dev Server HMR"]
+    Files --> HMR["Development Server HMR"]
     HMR --> Inspector
     Files --> Review["Diff, Verification, Undo"]
 ```
 
-## Các thành phần chính
+## Main components
 
-| Thành phần | Vai trò |
+| Component | Responsibility |
 | --- | --- |
-| **Studio** | Live preview, toolbar, selection state, anchored chat và diff viewer |
-| **Inspector Runtime** | Hover, click, drag selection và visual overlay |
-| **Selection Engine** | Biến DOM selection thành component candidates |
-| **Compiler Plugin** | Gắn source metadata vào JSX/TSX trong development build |
-| **Source Mapper** | Ánh xạ PatchLens ID về component, file và dòng code |
-| **Local Daemon** | Quản lý project, file access, agent session và streaming |
-| **Agent Protocol** | Giao thức chung cho Codex, Claude và provider khác |
-| **MCP Server** | Cho coding agent bên ngoài truy cập active selection |
-| **Patch Transaction** | Ghi nhận thay đổi của agent và hỗ trợ undo an toàn |
-| **Visual Verifier** | So sánh preview trước/sau và phát hiện runtime errors |
+| **Studio** | Live preview, toolbar, selection state, anchored chat, agent status, and diff viewer |
+| **Inspector Runtime** | Hover highlighting, click selection, drag selection, and visual overlays |
+| **Selection Engine** | Converts DOM nodes and rectangles into ranked source candidates |
+| **Compiler Plugin** | Adds development-only source metadata to JSX and TSX |
+| **Source Mapper** | Resolves PatchLens identifiers to components and source locations |
+| **Local Daemon** | Manages project access, preview state, agent sessions, and event streaming |
+| **Agent Protocol** | Defines provider-independent requests, sessions, and events |
+| **Provider Adapters** | Connect the shared protocol to Codex, Claude, and future agents |
+| **MCP Server** | Exposes the active selection to agents outside PatchLens Studio |
+| **Patch Transaction** | Tracks agent-owned file changes and provides safe undo |
+| **Visual Verifier** | Captures before/after state and detects runtime regressions |
 
-## Cấu trúc monorepo dự kiến
+## Repository structure
 
 ```text
 patchlens-ai/
 ├── apps/
-│   ├── studio/                  # Preview, toolbar, chat, diff viewer
-│   └── daemon/                  # Local server và agent session registry
+│   ├── studio/                  # Preview, toolbar, contextual chat, diff viewer
+│   └── daemon/                  # Local server and agent session registry
 │
 ├── packages/
-│   ├── cli/                     # init, dev, connect, disconnect, doctor
-│   ├── dev/                     # Package chính người dùng cài
-│   ├── inspector-runtime/       # Hover, click và drag selection
-│   ├── selection-engine/        # DOM rectangle → component candidates
-│   ├── source-mapper/           # PatchLens ID → source location
-│   ├── compiler-vite/           # React + Vite instrumentation
-│   ├── compiler-next/           # Next.js instrumentation
-│   ├── anchored-chat/           # Chat overlay độc lập với app CSS
-│   ├── agent-protocol/          # Types, schema và agent events
-│   ├── mcp-server/              # MCP tools cho external agents
-│   ├── provider-codex/          # Codex adapter
-│   ├── provider-claude/         # Claude adapter
-│   ├── patch-transaction/       # Diff, checkpoint và undo
-│   └── visual-verifier/         # Screenshot và runtime verification
+│   ├── agent-protocol/          # Shared selection and agent contracts
+│   ├── cli/                     # init, doctor, connect, disconnect
+│   ├── dev/                     # Main package installed by developers
+│   ├── inspector-runtime/       # Hover, click, and drag selection
+│   ├── compiler-vite/           # React + Vite source instrumentation
+│   ├── selection-engine/        # Planned standalone selection ranking package
+│   ├── source-mapper/           # Planned source-resolution package
+│   ├── mcp-server/              # Planned MCP bridge for external agents
+│   ├── provider-codex/          # Planned Codex adapter
+│   ├── provider-claude/         # Planned Claude adapter
+│   ├── patch-transaction/       # Planned diff, checkpoint, and undo layer
+│   └── visual-verifier/         # Planned visual and runtime verification
 │
 ├── examples/
 │   └── react-vite-demo/
@@ -262,105 +315,300 @@ patchlens-ai/
 └── docs/
 ```
 
-Người dùng chỉ cần cài một package. Các package con được giữ riêng để dễ kiểm thử, version và mở rộng framework/provider.
+Developers should eventually install only `@patchlens-ai/dev`. Internal packages remain separate so framework adapters, provider adapters, and core protocols can evolve independently.
 
-## Nguyên tắc an toàn
+## Current prototype
 
-PatchLens cho phép AI tự động sửa code nên an toàn repository là một phần của kiến trúc, không phải tính năng bổ sung.
+The repository currently contains source-level implementations for:
 
-- Daemon chỉ bind vào `127.0.0.1` theo mặc định.
-- Người dùng phải chọn hoặc cấp quyền cho project root.
-- Mỗi request tạo một patch transaction riêng.
-- Undo chỉ hoàn tác những thay đổi thuộc transaction của agent.
-- Không sử dụng `git reset --hard` để triển khai undo.
-- Không ghi đè thay đổi chưa commit của người dùng.
-- Secret, password và input nhạy cảm phải bị loại khỏi DOM capture.
-- PatchLens hiển thị provider nào sẽ nhận screenshot và source context.
-- Agent phải báo cáo khi cần mở rộng phạm vi ra ngoài component được chọn.
+- A pnpm and TypeScript monorepo foundation.
+- `@patchlens-ai/agent-protocol` selection and agent contracts.
+- A Vite development plugin that injects `data-patchlens-id` metadata.
+- A local source-manifest endpoint.
+- An Inspector runtime with hover, click, and drag selection.
+- PatchLens Studio with a live preview, Desktop/Tablet/Mobile controls, orientation switching, a source context panel, and anchored chat.
+- Responsive selection updates that keep rectangle and viewport metadata synchronized after iframe resize.
+- A local daemon with health checks and mock-agent sessions.
+- A React + Vite application used as the visual-selection test surface.
+- CLI foundations for `patchlens init` and `patchlens doctor`.
 
-## Phạm vi MVP
+The following are not implemented yet:
 
-MVP đầu tiên tập trung vào một vertical slice nhỏ nhưng chạy được hoàn chỉnh:
+- A real Codex provider adapter.
+- A real Claude provider adapter.
+- Agent-owned file editing and patch transactions.
+- Safe undo for agent changes.
+- MCP attached-session support.
+- Screenshot-based visual verification.
+- Next.js instrumentation.
+- Custom viewport dimensions, device scaling, and side-by-side breakpoint comparison.
 
-```text
-React + Vite
-    → tự động gắn source metadata
-    → hover/click/drag component
-    → anchored chat
-    → Codex managed session
-    → agent sửa file
-    → HMR cập nhật preview
-    → diff + undo
+## Running the prototype
+
+Once dependencies are available:
+
+```bash
+pnpm install
+pnpm build
+pnpm dev
 ```
 
-### Có trong MVP
+Expected local services:
 
-- React + Vite local project.
-- Click để chọn một element.
-- Drag để chọn một nhóm element.
-- Source manifest với component/file/line.
-- Anchored chat theo selection.
-- Local daemon.
-- Một Codex provider adapter.
-- HMR, diff và undo transaction.
+| Service | URL |
+| --- | --- |
+| PatchLens Studio | `http://127.0.0.1:4310` |
+| Local daemon | `http://127.0.0.1:4311` |
+| React/Vite demo | `http://127.0.0.1:4312` |
 
-### Chưa nằm trong MVP
+## Full roadmap
 
-- Website bên ngoài hoặc cross-origin page.
-- Browser extension.
-- Production website instrumentation.
-- Hỗ trợ mọi framework ngay từ đầu.
-- Tự động điều khiển mọi cuộc chat Codex/Claude đang mở mà không có bridge.
+### Milestone 0 — Foundation
 
-## Roadmap
+**Goal:** establish package boundaries and a repeatable local development environment.
 
-- [ ] **Phase 0 — Foundation:** pnpm monorepo, TypeScript, Studio, daemon và demo app.
-- [ ] **Phase 1 — Visual selection:** Vite compiler plugin, source manifest và Inspector.
-- [ ] **Phase 2 — Contextual chat:** Anchored chat và selection threads.
-- [ ] **Phase 3 — Codex integration:** Managed session, streaming, file edits và HMR.
-- [ ] **Phase 4 — MCP bridge:** Attached Codex session và agent tools.
-- [ ] **Phase 5 — Claude + Next.js:** Provider và framework mở rộng.
-- [ ] **Phase 6 — Visual verification:** Before/after capture, console checks và regression hints.
+- [x] Create the pnpm workspace.
+- [x] Add shared TypeScript configuration.
+- [x] Define the agent and selection protocol.
+- [x] Create Studio, daemon, and demo application boundaries.
+- [x] Add CLI and development-package foundations.
+- [ ] Complete dependency installation and build verification on a network-enabled environment.
+- [ ] Add continuous integration for typecheck, build, and tests.
 
-## Tiêu chí hoàn thành MVP
+**Exit criteria:** every workspace package builds from a clean checkout and the three local services start from one command.
 
-MVP được xem là hoàn thành khi:
+### Milestone 1 — Reliable visual selection
 
-- Cài được vào một React + Vite repository bằng command flow rõ ràng.
-- Studio hiển thị live preview của dự án.
-- Click hoặc drag trả về component và source location hợp lý.
-- Chat giữ đúng selection context trong toàn bộ thread.
-- Codex nhận được source, DOM và visual context.
-- Agent sửa file và preview cập nhật bằng HMR.
-- PatchLens hiển thị các file đã thay đổi.
-- Người dùng có thể undo riêng thay đổi của agent.
-- Production build không chứa PatchLens runtime.
+**Goal:** resolve visible UI regions to useful source candidates.
 
-## Định hướng dài hạn
+- [x] Add development-only JSX/TSX identifiers for React + Vite.
+- [x] Expose a local source manifest.
+- [x] Add hover highlighting.
+- [x] Add click selection.
+- [x] Add rectangle drag selection.
+- [x] Add exact, likely, and visual-only confidence levels.
+- [ ] Extract the ranking logic into a dedicated selection-engine package.
+- [ ] Add source-map and React Fiber fallbacks.
+- [ ] Handle fragments, portals, wrappers, and multiple DOM roots.
+- [ ] Add automated selection tests against representative React patterns.
 
-PatchLens AI không hướng đến việc trở thành một trình tạo website riêng biệt. Mục tiêu là trở thành **visual context layer cho coding agents**.
+**Exit criteria:** the demo resolves common UI selections to the correct source component with a measurable confidence score.
 
-Trong tương lai, bất kỳ coding agent nào cũng có thể hiểu các câu như:
+### Milestone 2 — Contextual conversation
 
-- "Sửa phần tôi đang chọn."
-- "Giữ layout nhưng đổi hierarchy của vùng này."
-- "Component này bị lệch ở mobile, sửa mà không ảnh hưởng desktop."
-- "So sánh với ảnh tham chiếu và chỉ cập nhật card đang chọn."
-- "Tiếp tục chỉnh vùng trước đó nhưng dùng design token hiện tại."
+**Goal:** make the selected visual region a durable part of an agent conversation.
 
-PatchLens cung cấp phần ngữ cảnh còn thiếu để AI chuyển những yêu cầu đó thành thay đổi code chính xác và có thể kiểm chứng.
+- [x] Display selected source information inside Studio.
+- [x] Anchor a chat surface to the selected region.
+- [x] Preserve a mock session across follow-up messages.
+- [x] Add Desktop, Tablet, and Mobile preview presets.
+- [x] Add portrait and landscape-style width switching for Tablet and Mobile.
+- [x] Republish selection rectangles and viewport dimensions after responsive changes.
+- [ ] Persist selection threads in the daemon.
+- [ ] Capture sanitized DOM and computed styles.
+- [ ] Capture the accessibility summary.
+- [ ] Capture selected-region screenshots.
+- [ ] Add custom width and height controls with saved device presets.
+- [ ] Add device scale, touch, hover, and reduced-motion emulation.
+- [ ] Add side-by-side breakpoint comparison without losing selection identity.
+- [ ] Add selection history and selection switching.
 
-## Tài liệu kỹ thuật
+**Exit criteria:** a developer can select a component, have a multi-turn conversation about it, and inspect the complete context payload.
 
-Đặc tả kiến trúc và kế hoạch triển khai chi tiết nằm tại:
+### Milestone 3 — Safe patch transactions
 
-- [`PATCHLENS_IMPLEMENTATION_PLAN.md`](./PATCHLENS_IMPLEMENTATION_PLAN.md)
+**Goal:** create a safe foundation before allowing an agent to modify files.
 
-## Trạng thái dự án
+- [ ] Capture file baselines before every agent request.
+- [ ] Track files changed while the agent is running.
+- [ ] Separate agent changes from concurrent developer changes.
+- [ ] Generate a unified diff for each transaction.
+- [ ] Implement transaction-scoped undo without destructive Git commands.
+- [ ] Detect scope expansion beyond the selected component.
+- [ ] Prevent accidental writes outside the approved project root.
 
-PatchLens AI hiện đang ở giai đoạn **early development**. Kiến trúc và product flow đang được xây dựng trước, sau đó triển khai theo từng vertical slice có thể chạy và kiểm thử được.
+**Exit criteria:** a mock editor can change files, produce a reviewable diff, and undo only its own changes.
 
-Các API, command và package name trong README có thể thay đổi trong quá trình thử nghiệm.
+### Milestone 4 — Codex managed sessions
+
+**Goal:** replace the mock agent with a supported Codex integration.
+
+- [ ] Confirm the official Codex integration surface for session creation and continuation.
+- [ ] Detect Codex availability and authentication state.
+- [ ] Implement the `provider-codex` adapter.
+- [ ] Create sessions scoped to the selected project root.
+- [ ] Stream status, assistant messages, tool activity, and changed files.
+- [ ] Send structured selection context instead of an unstructured prompt dump.
+- [ ] Support cancellation, cleanup, and recoverable provider failures.
+- [ ] Connect Codex edits to patch transactions.
+
+**Exit criteria:** a Studio chat request reaches Codex, modifies the intended component, and returns a reviewable transaction.
+
+### Milestone 5 — Live verification
+
+**Goal:** close the loop between agent edits and visible results.
+
+- [ ] Detect development-server and HMR state.
+- [ ] Wait for the selected component to render after a file change.
+- [ ] Collect new console and runtime errors.
+- [ ] Capture the selected region before and after the change.
+- [ ] Display before/after comparison inside Studio.
+- [ ] Verify the requested change at the active responsive viewport.
+- [ ] Optionally run regression captures across Desktop, Tablet, and Mobile.
+- [ ] Report whether the selected component still exists.
+- [ ] Run project-specific verification commands when configured.
+- [ ] Continue the same chat thread after verification.
+
+**Exit criteria:** every applied agent transaction produces a visible result, a diff, and a verification report.
+
+### Milestone 6 — MCP attached sessions
+
+**Goal:** let Codex running outside Studio access the active PatchLens selection.
+
+- [ ] Implement the PatchLens MCP server.
+- [ ] Add authenticated communication between the MCP server and local daemon.
+- [ ] Expose active-selection and verification tools.
+- [ ] Implement `patchlens connect codex`.
+- [ ] Add a Codex skill or plugin that explains the PatchLens workflow.
+- [ ] Implement `patchlens disconnect codex`.
+- [ ] Extend `patchlens doctor` with MCP diagnostics.
+
+**Exit criteria:** an external Codex task can retrieve the current selection, edit the repository, and report the result back through PatchLens context.
+
+### Milestone 7 — Claude and framework expansion
+
+**Goal:** prove that the architecture is provider-independent and framework-extensible.
+
+- [ ] Implement the Claude provider adapter.
+- [ ] Add Claude MCP installation and diagnostics.
+- [ ] Add Next.js source instrumentation.
+- [ ] Handle Server and Client Component boundaries.
+- [ ] Evaluate Vue and Svelte compiler adapters.
+- [ ] Add framework capability detection to the CLI.
+
+**Exit criteria:** at least two coding-agent providers and two web framework integrations pass the same core selection contract.
+
+### Milestone 8 — External pages and production-grade distribution
+
+**Goal:** extend beyond injected local previews and prepare public distribution.
+
+- [ ] Design a browser-extension or reverse-proxy mode for external pages.
+- [ ] Add explicit permission and origin controls.
+- [ ] Package and publish `@patchlens-ai/dev`.
+- [ ] Add versioned protocol migrations.
+- [ ] Add telemetry that is opt-in and privacy-preserving.
+- [ ] Add installation, troubleshooting, and provider documentation.
+- [ ] Add release automation and changelogs.
+- [ ] Define licensing and contribution policy.
+
+**Exit criteria:** a developer can install PatchLens into a supported repository from the package registry and follow a documented, recoverable workflow.
+
+## Security and safety principles
+
+Allowing an AI agent to edit a repository makes safety part of the architecture, not an optional feature.
+
+- The daemon should bind to `127.0.0.1` by default.
+- Every Studio session should use a local authentication token.
+- The developer must approve the project root.
+- Requests must not write outside the approved root.
+- Secrets, passwords, tokens, and sensitive form values must be removed from captured DOM.
+- PatchLens must display which provider receives source code or screenshots.
+- Every edit request should create a transaction.
+- Undo must restore only the files and changes owned by that transaction.
+- PatchLens must not use `git reset --hard` as an undo implementation.
+- Existing uncommitted developer changes must be preserved.
+- The agent must report when it needs to expand beyond the selected component.
+
+## Frequently asked questions
+
+### Is PatchLens AI a website builder?
+
+No. PatchLens is intended to be a visual context layer for existing repositories and coding agents. It should work with the developer's current application, framework, design system, and source code rather than replacing them with a proprietary builder.
+
+### Does PatchLens only send a screenshot to the agent?
+
+No. A screenshot is one part of the context. PatchLens also sends source candidates, DOM, component metadata, styles, route information, viewport details, and runtime errors when available.
+
+### Can I preview and target desktop, tablet, and mobile layouts?
+
+Yes. The current prototype includes a fluid Desktop mode, a `768 px` Tablet mode, and a `390 px` Mobile mode. Tablet and Mobile can switch to wider landscape-style breakpoints. PatchLens keeps the same selection thread, updates its rectangle after the iframe resizes, and includes the active preset, orientation, and actual viewport dimensions in the request sent to the agent.
+
+This first implementation focuses on responsive CSS behavior. It does not yet emulate every physical-device feature such as touch input, browser chrome, user-agent differences, safe-area insets, or exact device pixel ratio.
+
+### How can PatchLens identify the correct component automatically?
+
+The preferred path is development-time compiler instrumentation. JSX and TSX elements receive a local identifier that maps back to a source manifest. Source maps and framework internals can provide fallbacks when direct metadata is unavailable.
+
+### Is one DOM element always equal to one React component?
+
+No. Components can render fragments, multiple roots, portals, wrapper elements, or shared primitives. PatchLens therefore returns ranked candidates and a confidence level instead of pretending every selection is exact.
+
+### Why support both click and drag selection?
+
+Click selection is best for a single element. Drag selection is useful when the developer means a group, layout section, or visual region that does not map cleanly to one DOM node.
+
+### Will the chat really appear below the selected element?
+
+Yes. The chat is rendered in an isolated Studio or Shadow DOM overlay and positioned using the selected rectangle. It should not alter the application layout or inherit unsafe styles from the previewed application.
+
+### Can PatchLens attach itself to any Codex or Claude conversation already open?
+
+Not universally. A web page cannot safely take control of an arbitrary external agent session. PatchLens uses managed sessions when it owns the conversation, and MCP attached mode when an external agent is explicitly configured to access PatchLens.
+
+### Does the agent edit code automatically?
+
+That is the intended experience. However, automatic editing must run through patch transactions so the developer can inspect changed files, verify the result, and undo only the agent-owned changes.
+
+### Why not lock the agent to a single selected file?
+
+The visible component may depend on shared CSS, a design token, a parent layout, or a common UI primitive. The default policy should prefer the selected component while requiring the agent to report meaningful scope expansion.
+
+### How will undo work when the repository already has uncommitted changes?
+
+PatchLens should capture a transaction baseline, track only files changed by the agent, and generate a reverse operation for those exact changes. It must not reset the entire worktree or remove unrelated developer edits.
+
+### Does PatchLens work on external websites?
+
+Not in the first release. Cross-origin pages prevent a normal iframe from inspecting the DOM. External-page support requires a browser extension, an injected script with explicit permission, or a controlled reverse proxy.
+
+### Will PatchLens code appear in production builds?
+
+It should not. Compiler metadata and Inspector runtime are development-only features and must be removed from production output.
+
+### Which frameworks will be supported first?
+
+React + Vite is the first target because it provides a focused environment for validating the selection contract. Next.js follows after the React/Vite flow and Codex integration are stable.
+
+### Which coding agents will be supported first?
+
+Codex is the first managed-session target. Claude is planned after the provider-independent protocol and patch-transaction flow have been validated.
+
+### Can other agents integrate with PatchLens later?
+
+Yes. New agents should implement the shared `CodingProvider` interface or connect through MCP. Inspector and Studio should not contain provider-specific behavior.
+
+### Why does PatchLens need a local daemon?
+
+A browser application cannot freely read repository files, start local coding tools, manage project permissions, or create safe file transactions. The daemon provides those local capabilities while keeping the Studio UI web-based.
+
+### How will sensitive data be protected?
+
+PatchLens should sanitize captured DOM, remove sensitive input values, keep the daemon local, require project permission, and clearly identify which provider receives each type of context.
+
+### Is the package ready to install today?
+
+No. The current repository is an early prototype. The intended package name and command-line experience are documented so the implementation can be built toward a stable public contract.
+
+## Documentation
+
+- [`PATCHLENS_IMPLEMENTATION_PLAN.md`](./PATCHLENS_IMPLEMENTATION_PLAN.md) — detailed technical architecture and implementation plan.
+- [`docs/NEXT_STEPS.md`](./docs/NEXT_STEPS.md) — ordered execution plan from the current prototype to provider integrations.
+
+## Project status
+
+PatchLens AI is in **early development**. Interfaces, command names, package names, and architectural boundaries may change while the first vertical slice is verified.
+
+Contributions should currently focus on architecture feedback, reproducible selection cases, framework edge cases, and provider integration research.
 
 ---
 
