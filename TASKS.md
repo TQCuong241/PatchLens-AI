@@ -13,9 +13,10 @@
 
 ## Gate còn lại
 
-1. Repo administrator thêm `NPM_TOKEN` vào GitHub environment `npm`; tài khoản có quyền push không thể quản lý environment secret.
-2. Dispatch workflow `Release` trên tag `v0.1.0` với `dry_run=false` và dist-tag `next`.
-3. Chạy `corepack pnpm release:verify -- --tag next`; chỉ đóng `REL-001` khi đủ 17 package, dependency closure, integrity và provenance đều đạt.
+1. Tạo npm organization `patchlens-ai`, thêm tài khoản publisher và xác nhận quyền write cho scope `@patchlens-ai`.
+2. Repo administrator thêm `NPM_TOKEN` vào GitHub environment `npm`; tài khoản có quyền push không thể quản lý environment secret.
+3. Dispatch workflow `Release` trên tag `v0.1.0` với `dry_run=false` và dist-tag `next`.
+4. Chạy `corepack pnpm release:verify -- --tag next`; chỉ đóng `REL-001` khi đủ 17 package, dependency closure, integrity và provenance đều đạt.
 
 ## Bằng chứng validation — 2026-08-10
 
@@ -31,7 +32,7 @@
 - URL boundary regression: CLI host và MCP daemon chỉ chấp nhận plain loopback HTTP origin; credential, path, query và fragment đều bị từ chối.
 - GitHub CI run `31404959642`: xanh trên Node `20.19.0`, Node `24` và Chromium E2E sau khi đổi Next fixture sang `next.config.mjs`.
 - Annotated tag `v0.1.0` trỏ tới commit `9d9494d`; GitHub Release dry-run `31405321455` xanh trên chính tag này.
-- npm registry preflight: cả 17 package version `0.1.0` chưa tồn tại; GitHub environment `npm` đã được tạo nhưng chưa có `NPM_TOKEN`.
+- npm registry preflight: cả 17 package version `0.1.0` chưa tồn tại; `npm org ls patchlens-ai` trả `E404 Scope not found`, máy hiện tại trả `ENEEDAUTH`, GitHub environment `npm` đã được tạo nhưng chưa có `NPM_TOKEN`.
 - `release:verify` đã qua mock registry đủ 17 package; success path kiểm integrity, dist-tag, dependency closure, tarball leak và provenance; Node 20/24 đều xử lý đúng prepublish failure.
 
 ## P0 — Engineering Baseline

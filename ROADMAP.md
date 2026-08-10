@@ -1,7 +1,7 @@
 # PatchLens AI Roadmap
 
 > Cập nhật: 2026-08-10
-> Trạng thái: source R0–R7, clean-copy frozen install, CI, tag `v0.1.0` và cloud release dry-run đã hoàn tất; release còn chờ repo administrator thêm `NPM_TOKEN`, publish và verify.
+> Trạng thái: source R0–R7, clean-copy frozen install, CI, tag `v0.1.0` và cloud release dry-run đã hoàn tất; release còn chờ tạo npm organization `patchlens-ai`, repo administrator thêm `NPM_TOKEN`, publish và verify.
 
 ## 1. Trạng thái hiện tại
 
@@ -20,17 +20,19 @@
 
 ### Chưa có
 
+- npm organization/scope `patchlens-ai` chưa tồn tại; registry trả `E404 Scope not found` ngày 2026-08-10 và máy hiện tại chưa đăng nhập npm.
 - GitHub environment `npm` chưa có secret `NPM_TOKEN`; tài khoản có quyền push không có quyền quản lý secret.
 - npm publish cùng consumer-install verification; workflow thật chưa thể chạy khi thiếu secret.
 
 ### Kết luận
 
-Critical path, clean-copy validation, CI Node 20/24, 2 Chromium E2E, merge, push, tag và cloud dry-run đã hoàn tất. Việc còn lại là cấp release secret, publish dist-tag `next` và verify package từ npm.
+Critical path, clean-copy validation, CI Node 20/24, 2 Chromium E2E, merge, push, tag và cloud dry-run đã hoàn tất. Việc còn lại là tạo npm organization, cấp release secret, publish dist-tag `next` và verify package từ npm.
 
 ## 2. Rủi ro cần xử lý sớm
 
 | Mức | Rủi ro | Tác động | Hướng xử lý |
 | --- | --- | --- | --- |
+| Cao | npm organization/scope `patchlens-ai` chưa tồn tại | Mọi publish `@patchlens-ai/*` sẽ lỗi trước khi tạo package | Tạo organization trên npm, thêm publisher và xác nhận quyền write cho scope |
 | Cao | GitHub environment `npm` chưa có `NPM_TOKEN` | Workflow publish thật không thể xác thực với npm | Repo administrator thêm secret có quyền publish scope `@patchlens-ai`, không gửi token qua chat |
 | Cao | SDK Codex/Claude và Next.js còn ở version thay đổi nhanh | Minor update có thể đổi event hoặc option types | Lock exact resolution, typecheck và adapter contract tests |
 | Cao | Screenshot có thể chứa dữ liệu nhạy cảm dạng pixel | DOM sanitizer không bảo vệ screenshot | Hiển thị provider, giới hạn capture và yêu cầu người dùng tránh vùng nhạy cảm |

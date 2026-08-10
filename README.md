@@ -318,7 +318,7 @@ React + Vite
 
 ## Roadmap
 
-Trạng thái thực tế ngày **2026-08-10**: source R0–R7, clean-copy frozen install, CI Node 20/24, coverage floor, production leak checks, tag `v0.1.0`, cloud release dry-run và 2 Chromium E2E đã đạt. Release còn chờ `NPM_TOKEN`, publish dist-tag `next` và verify.
+Trạng thái thực tế ngày **2026-08-10**: source R0–R7, clean-copy frozen install, CI Node 20/24, coverage floor, production leak checks, tag `v0.1.0`, cloud release dry-run và 2 Chromium E2E đã đạt. Release còn chờ tạo npm organization `patchlens-ai`, cấp `NPM_TOKEN`, publish dist-tag `next` và verify.
 
 - [x] **Phase 0 — Foundation:** pnpm monorepo, protocol v1, test/CI, Studio, daemon và demo app.
 - [x] **Phase 1 — Visual selection:** Vite compiler plugin, source manifest và Inspector.

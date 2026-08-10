@@ -13,6 +13,12 @@
 
 ## 2. Credential
 
+Trước lần publish đầu tiên:
+
+- Đăng nhập npm bằng tài khoản publisher; không gửi password, OTP hoặc token qua chat.
+- Tạo npm organization `patchlens-ai` và thêm publisher có quyền write cho scope `@patchlens-ai`.
+- Xác nhận `npm org ls patchlens-ai` trả danh sách thành viên thay vì `E404 Scope not found`.
+
 Npm publisher cần:
 
 - Quyền publish scope `@patchlens-ai`.
