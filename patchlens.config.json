@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "projectRoot": "examples/react-vite-demo",
+  "host": {
+    "start": true,
+    "command": "corepack",
+    "args": ["pnpm", "run", "dev"],
+    "url": "http://127.0.0.1:4311"
+  },
+  "studio": {
+    "port": 4310
+  },
+  "daemon": {
+    "port": 4312
+  },
+  "provider": "mock"
+}

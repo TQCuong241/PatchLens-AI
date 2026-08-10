@@ -1,23 +1,51 @@
 {
   "name": "patchlens-ai",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Visual context layer for AI coding agents.",
+  "type": "module",
+  "description": "Local visual context layer for AI coding agents.",
   "packageManager": "pnpm@10.16.0",
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
-    "build": "pnpm -r build",
-    "build:packages": "pnpm --filter \"./packages/**\" build",
-    "dev": "pnpm build:packages && concurrently -k -n daemon,demo,studio -c green,yellow,cyan \"pnpm --filter @patchlens-ai/daemon dev\" \"pnpm --filter @patchlens-ai/react-vite-demo dev\" \"pnpm --filter @patchlens-ai/studio dev\"",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "build": "corepack pnpm -r build",
+    "build:packages": "corepack pnpm --filter @patchlens-ai/dev... build",
+    "check": "corepack pnpm format:check && corepack pnpm lint && corepack pnpm build && corepack pnpm typecheck:workspaces && corepack pnpm test:workspaces",
+    "dev": "corepack pnpm --filter @patchlens-ai/dev... build && node packages/dev/dist/bin.js dev --cwd .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "release:check": "node scripts/check-release-metadata.mjs",
+    "release:dry-run": "corepack pnpm release:check && corepack pnpm build:packages && node scripts/dry-run-release.mjs",
+    "test:e2e": "node scripts/check-playwright-browser.mjs && corepack pnpm build:packages && playwright test",
+    "test:coverage": "corepack pnpm build:packages && vitest run --coverage",
+    "test:workspaces": "vitest run",
+    "typecheck": "corepack pnpm build:packages && corepack pnpm typecheck:workspaces",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "typecheck:workspaces": "corepack pnpm -r typecheck && corepack pnpm typecheck:e2e",
+    "test": "corepack pnpm build:packages && corepack pnpm test:workspaces"
   },
   "devDependencies": {
+    "@patchlens-ai/agent-protocol": "workspace:*",
+    "@patchlens-ai/provider-codex": "workspace:*",
+    "@eslint/js": "^10.0.0",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^24.5.2",
-    "concurrently": "^9.2.1",
+    "@vitest/coverage-v8": "^4.1.0",
+    "eslint": "^10.0.0",
+    "prettier": "3.9.0",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^4.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
   }
 }

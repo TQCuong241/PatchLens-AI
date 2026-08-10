@@ -8,7 +8,7 @@
 
 PatchLens AI giúp lập trình viên chọn trực tiếp một vùng trên giao diện web, mở cuộc trò chuyện ngay tại vị trí đó và yêu cầu coding agent sửa đúng component trong source code.
 
-![Status](https://img.shields.io/badge/status-early_development-E85D2A?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-MVP_validation-E85D2A?style=for-the-badge)
 ![Runtime](https://img.shields.io/badge/runtime-Node.js-236D4A?style=for-the-badge&logo=node.js&logoColor=white)
 ![Language](https://img.shields.io/badge/language-TypeScript-245E9D?style=for-the-badge&logo=typescript&logoColor=white)
 ![Agents](https://img.shields.io/badge/agents-Codex_%7C_Claude-18201D?style=for-the-badge)
@@ -63,7 +63,9 @@ npm run patchlens
 ```
 
 > [!IMPORTANT]
-> Các command trên là **trải nghiệm cài đặt mục tiêu**. Repository hiện đang ở giai đoạn đầu và package chưa được phát hành.
+> Package chưa được phát hành lên npm. Source, non-browser gate và Chromium E2E đã đạt; release còn chờ clean-checkout install, commit lockfile và publish.
+
+Quickstart chạy từ React + Vite repository sạch: [`docs/quickstart.md`](./docs/quickstart.md).
 
 Sau khi PatchLens Studio mở:
 
@@ -301,8 +303,10 @@ React + Vite
 - Source manifest với component/file/line.
 - Anchored chat theo selection.
 - Local daemon.
-- Một Codex provider adapter.
+- Codex và Claude managed provider adapter.
 - HMR, diff và undo transaction.
+- MCP attached session cho Codex.
+- Next.js development instrumentation ở mức mở rộng sau Vite MVP.
 
 ### Chưa nằm trong MVP
 
@@ -314,13 +318,20 @@ React + Vite
 
 ## Roadmap
 
-- [ ] **Phase 0 — Foundation:** pnpm monorepo, TypeScript, Studio, daemon và demo app.
-- [ ] **Phase 1 — Visual selection:** Vite compiler plugin, source manifest và Inspector.
-- [ ] **Phase 2 — Contextual chat:** Anchored chat và selection threads.
-- [ ] **Phase 3 — Codex integration:** Managed session, streaming, file edits và HMR.
-- [ ] **Phase 4 — MCP bridge:** Attached Codex session và agent tools.
-- [ ] **Phase 5 — Claude + Next.js:** Provider và framework mở rộng.
-- [ ] **Phase 6 — Visual verification:** Before/after capture, console checks và regression hints.
+Trạng thái thực tế ngày **2026-08-10**: source R0–R7, `check`, coverage floor, production leak checks, release dry-run và 2 Chromium E2E đã đạt. Release còn chờ clean-checkout frozen install, commit `pnpm-lock.yaml` và publish.
+
+- [x] **Phase 0 — Foundation:** pnpm monorepo, protocol v1, test/CI, Studio, daemon và demo app.
+- [x] **Phase 1 — Visual selection:** Vite compiler plugin, source manifest và Inspector.
+- [x] **Phase 2 — Contextual chat:** Anchored chat và selection threads.
+- [x] **Phase 3 — Codex integration:** Managed session, streaming, file edits và HMR transaction flow.
+- [x] **Phase 4 — MCP bridge:** Attached Codex session và agent tools.
+- [x] **Phase 5 — Claude + Next.js:** Managed provider và framework instrumentation.
+- [x] **Phase 6 — Visual verification:** Before/after capture, console checks, perceptual comparison và regression hints.
+
+Kế hoạch thực thi và backlog hiện tại:
+
+- [`ROADMAP.md`](./ROADMAP.md)
+- [`TASKS.md`](./TASKS.md)
 
 ## Tiêu chí hoàn thành MVP
 
@@ -355,10 +366,23 @@ PatchLens cung cấp phần ngữ cảnh còn thiếu để AI chuyển những 
 Đặc tả kiến trúc và kế hoạch triển khai chi tiết nằm tại:
 
 - [`PATCHLENS_IMPLEMENTATION_PLAN.md`](./PATCHLENS_IMPLEMENTATION_PLAN.md)
+- [`ROADMAP.md`](./ROADMAP.md)
+- [`TASKS.md`](./TASKS.md)
+- [`docs/protocol.md`](./docs/protocol.md)
+- [`docs/quickstart.md`](./docs/quickstart.md)
+- [`docs/security.md`](./docs/security.md)
+- [`docs/adr/0001-protocol-v1.md`](./docs/adr/0001-protocol-v1.md)
+- [`docs/adr/0002-vite-instrumentation.md`](./docs/adr/0002-vite-instrumentation.md)
+- [`docs/adr/0003-codex-managed-provider.md`](./docs/adr/0003-codex-managed-provider.md)
+- [`docs/adr/0004-claude-managed-provider.md`](./docs/adr/0004-claude-managed-provider.md)
+- [`docs/spikes/nextjs-instrumentation.md`](./docs/spikes/nextjs-instrumentation.md)
+- [`docs/spikes/cross-origin-mode.md`](./docs/spikes/cross-origin-mode.md)
+- [`docs/spikes/sqlite-history.md`](./docs/spikes/sqlite-history.md)
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 
 ## Trạng thái dự án
 
-PatchLens AI hiện đang ở giai đoạn **early development**. Kiến trúc và product flow đang được xây dựng trước, sau đó triển khai theo từng vertical slice có thể chạy và kiểm thử được.
+PatchLens AI hiện ở giai đoạn **MVP release candidate**. 92/94 tracked tasks đã qua DoD; `FND-001` và `REL-001` còn partial vì clean-checkout/release gate.
 
 Các API, command và package name trong README có thể thay đổi trong quá trình thử nghiệm.
 

@@ -1,0 +1,14 @@
+.pnpm-store/
+coverage/
+**/.next/
+**/server-dist/
+**/next-env.d.ts
+playwright-report/
+release-artifacts/
+test-results/
+dist/
+node_modules/
+PATCHLENS_IMPLEMENTATION_PLAN.md
+README.md
+ROADMAP.md
+TASKS.md

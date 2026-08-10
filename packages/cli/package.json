@@ -1,0 +1,49 @@
+{
+  "name": "@patchlens-ai/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@patchlens-ai/daemon": "workspace:*",
+    "@patchlens-ai/mcp-server": "workspace:*",
+    "@patchlens-ai/studio": "workspace:*"
+  },
+  "description": "CLI orchestration commands for PatchLens AI development sessions.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

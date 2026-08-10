@@ -9,6 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
+    "newLine": "lf",
     "useDefineForClassFields": true
   }
 }

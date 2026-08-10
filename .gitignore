@@ -4,6 +4,13 @@ dist/
 .npm-cache/
 .vite/
 coverage/
+.next/
+server-dist/
+playwright-report/
+release-artifacts/
+test-results/
+.patchlens/
+*.tsbuildinfo
 *.log
 .DS_Store
 .env

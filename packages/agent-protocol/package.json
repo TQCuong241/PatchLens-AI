@@ -1,7 +1,6 @@
 {
   "name": "@patchlens-ai/agent-protocol",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,9 +10,35 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "description": "Versioned runtime-validated protocol contracts for PatchLens AI.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "packages/agent-protocol"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

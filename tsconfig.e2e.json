@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@patchlens-ai/agent-protocol": ["packages/agent-protocol/src/index.ts"],
+      "@patchlens-ai/provider-codex": ["packages/provider-codex/src/index.ts"]
+    },
+    "types": ["node", "@playwright/test"]
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
+}

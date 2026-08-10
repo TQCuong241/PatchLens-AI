@@ -1,0 +1,47 @@
+{
+  "name": "@patchlens-ai/provider-mock",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@patchlens-ai/agent-protocol": "workspace:*"
+  },
+  "description": "Deterministic local coding provider for PatchLens AI development and tests.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "packages/provider-mock"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

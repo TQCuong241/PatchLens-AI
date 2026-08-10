@@ -1,0 +1,53 @@
+{
+  "name": "@patchlens-ai/compiler-next",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./loader": {
+      "types": "./dist/loader.d.ts",
+      "import": "./dist/loader.js",
+      "default": "./dist/loader.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@patchlens-ai/agent-protocol": "workspace:*",
+    "@patchlens-ai/compiler-vite": "workspace:*"
+  },
+  "description": "Development-only Next.js source instrumentation for PatchLens AI.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "packages/compiler-next"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

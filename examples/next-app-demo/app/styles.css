@@ -1,0 +1,48 @@
+:root {
+  color: #15231e;
+  background: #eef4ef;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px;
+}
+
+.hero {
+  width: min(720px, 100%);
+  padding: 48px;
+  border: 1px solid #b9c8bd;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgb(20 43 34 / 12%);
+}
+
+.eyebrow {
+  color: #2e6c51;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.counter {
+  margin-top: 20px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #286348;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

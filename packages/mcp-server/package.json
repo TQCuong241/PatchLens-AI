@@ -1,0 +1,54 @@
+{
+  "name": "@patchlens-ai/mcp-server",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "patchlens-mcp": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@patchlens-ai/agent-protocol": "workspace:*",
+    "@patchlens-ai/daemon-client": "workspace:*",
+    "@patchlens-ai/visual-verifier": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "description": "MCP server exposing active PatchLens AI selection and verification tools.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "packages/mcp-server"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

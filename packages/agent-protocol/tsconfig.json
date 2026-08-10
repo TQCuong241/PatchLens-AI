@@ -4,8 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
+    "declarationMap": true,
     "rootDir": "src",
     "outDir": "dist"
   },

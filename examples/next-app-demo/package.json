@@ -1,0 +1,22 @@
+{
+  "name": "@patchlens-ai/next-app-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build && node ../../scripts/check-production-leak.mjs .next",
+    "dev": "next dev --hostname 127.0.0.1 --port 4311",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@patchlens-ai/dev": "workspace:*",
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3"
+  }
+}

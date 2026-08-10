@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate package tarballs without publishing
+        required: true
+        type: boolean
+        default: true
+      tag:
+        description: npm dist-tag for a real publish
+        required: true
+        type: choice
+        options:
+          - next
+          - latest
+        default: next
+
+concurrency:
+  group: patchlens-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm release:check
+      - if: ${{ inputs.dry_run }}
+        run: pnpm release:dry-run
+      - if: ${{ ! inputs.dry_run }}
+        run: pnpm -r publish --access public --provenance --no-git-checks --tag "${{ inputs.tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

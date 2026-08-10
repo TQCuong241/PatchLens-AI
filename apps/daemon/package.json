@@ -1,0 +1,57 @@
+{
+  "name": "@patchlens-ai/daemon",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    }
+  },
+  "bin": {
+    "patchlens-daemon": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@patchlens-ai/agent-protocol": "workspace:*",
+    "@patchlens-ai/patch-transaction": "workspace:*",
+    "@patchlens-ai/provider-claude": "workspace:*",
+    "@patchlens-ai/provider-codex": "workspace:*",
+    "@patchlens-ai/provider-mock": "workspace:*",
+    "@patchlens-ai/visual-verifier": "workspace:*"
+  },
+  "description": "Authenticated loopback daemon for PatchLens AI agent sessions and patch transactions.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "apps/daemon"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

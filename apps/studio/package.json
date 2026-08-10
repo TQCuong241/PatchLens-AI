@@ -1,0 +1,57 @@
+{
+  "name": "@patchlens-ai/studio",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./server": {
+      "types": "./server-dist/index.d.ts",
+      "import": "./server-dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "server-dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "dev": "vite --host 127.0.0.1 --port 4310",
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@patchlens-ai/agent-protocol": "workspace:*",
+    "@patchlens-ai/daemon-client": "workspace:*",
+    "@patchlens-ai/provider-mock": "workspace:*",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "vite": "^8.1.5"
+  },
+  "description": "Local visual selection, chat, diff, and verification Studio for PatchLens AI.",
+  "keywords": [
+    "visual-coding",
+    "ai",
+    "development-tools",
+    "patchlens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TQCuong241/PatchLens-AI.git",
+    "directory": "apps/studio"
+  },
+  "homepage": "https://github.com/TQCuong241/PatchLens-AI#readme",
+  "bugs": {
+    "url": "https://github.com/TQCuong241/PatchLens-AI/issues"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
