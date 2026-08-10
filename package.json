@@ -18,6 +18,7 @@
     "lint": "eslint .",
     "release:check": "node scripts/check-release-metadata.mjs",
     "release:dry-run": "corepack pnpm release:check && corepack pnpm build:packages && node scripts/dry-run-release.mjs",
+    "release:verify": "node scripts/verify-published-release.mjs",
     "test:e2e": "node scripts/check-playwright-browser.mjs && corepack pnpm build:packages && playwright test",
     "test:coverage": "corepack pnpm build:packages && vitest run --coverage",
     "test:workspaces": "vitest run",

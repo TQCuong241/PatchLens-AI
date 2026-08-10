@@ -14,8 +14,9 @@
 - Mock, Codex và Claude managed providers; Codex attached mode qua MCP.
 - Vite/Next fixtures, unit/integration tests và Playwright Chromium E2E cho click-to-code cùng Codex/HMR.
 - Quickstart, security/privacy model, ADR và extension spikes.
-- `pnpm-lock.yaml`, clean-copy frozen offline install giữ nguyên 184 source hash, 19-workspace build/typecheck, 170 tests và production leak checks.
+- `pnpm-lock.yaml`, clean-copy frozen offline install giữ nguyên 187 source hash, 19-workspace build/typecheck, 172 tests và production leak checks.
 - Coverage toàn source có regression floor; release dry-run đã kiểm 17 tarball cùng dependency closure.
+- Post-publish verifier kiểm npm dist-tag, internal dependency closure, tarball integrity, source leak và provenance cho đủ 17 package.
 
 ### Chưa có
 

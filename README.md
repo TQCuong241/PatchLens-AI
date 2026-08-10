@@ -370,6 +370,7 @@ PatchLens cung cấp phần ngữ cảnh còn thiếu để AI chuyển những 
 - [`TASKS.md`](./TASKS.md)
 - [`docs/protocol.md`](./docs/protocol.md)
 - [`docs/quickstart.md`](./docs/quickstart.md)
+- [`docs/release.md`](./docs/release.md)
 - [`docs/security.md`](./docs/security.md)
 - [`docs/adr/0001-protocol-v1.md`](./docs/adr/0001-protocol-v1.md)
 - [`docs/adr/0002-vite-instrumentation.md`](./docs/adr/0002-vite-instrumentation.md)

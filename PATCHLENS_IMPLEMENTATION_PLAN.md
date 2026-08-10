@@ -10,6 +10,7 @@ Tài liệu này giữ đường dẫn tương thích cho đặc tả triển kh
 - [`docs/protocol.md`](./docs/protocol.md) — protocol, message và compatibility contract.
 - [`docs/security.md`](./docs/security.md) — trust boundary, dữ liệu nhạy cảm và quyền ghi.
 - [`docs/quickstart.md`](./docs/quickstart.md) — luồng cài đặt và chạy React + Vite.
+- [`docs/release.md`](./docs/release.md) — quy trình dry-run, publish, provenance và verify npm.
 - [`docs/adr/`](./docs/adr/) — quyết định kiến trúc đã chốt.
 - [`docs/spikes/`](./docs/spikes/) — nghiên cứu Next.js, cross-origin và persistence.
 

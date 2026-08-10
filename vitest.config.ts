@@ -19,7 +19,7 @@ const nodeProject = {
     environment: 'node',
     include: workspaceTestPattern
       ? [workspaceTestPattern]
-      : ['apps/*/test/**/*.test.ts', 'packages/*/test/**/*.test.ts'],
+      : ['apps/*/test/**/*.test.ts', 'packages/*/test/**/*.test.ts', 'scripts/**/*.test.mjs'],
     exclude: [studioDomTestPattern, 'packages/dev/test/**', 'packages/inspector-runtime/test/**'],
   },
 };

@@ -72,6 +72,7 @@ pnpm check
 pnpm format:check
 pnpm release:check
 pnpm release:dry-run
+pnpm release:verify -- --tag next
 ```
 
-Workflow `.github/workflows/release.yml` mặc định chạy dry-run. Chỉ chọn real publish sau khi clean install với frozen lockfile và mọi gate đạt; npm environment phải có `NPM_TOKEN` hoặc trusted publishing tương đương.
+Workflow `.github/workflows/release.yml` mặc định chạy dry-run. Chỉ chọn real publish sau khi clean install với frozen lockfile và mọi gate đạt; npm environment phải có `NPM_TOKEN`. Sau publish, chạy verifier theo [`docs/release.md`](./docs/release.md).
