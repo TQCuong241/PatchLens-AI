@@ -13,9 +13,9 @@
 
 ## Gate còn lại
 
-1. Hoàn tất merge commit, fetch lại remote rồi push đúng commit đã qua gate.
-2. Tạo tag release từ commit bất biến và publish 17 package với dist-tag `next`.
-3. Chỉ đóng `REL-001` sau khi cài thử package từ npm và verify version, dependency closure cùng provenance.
+1. Repo administrator thêm `NPM_TOKEN` vào GitHub environment `npm`; tài khoản có quyền push không thể quản lý environment secret.
+2. Dispatch workflow `Release` trên tag `v0.1.0` với `dry_run=false` và dist-tag `next`.
+3. Chỉ đóng `REL-001` sau khi cài thử 17 package từ npm và verify version, dependency closure cùng provenance.
 
 ## Bằng chứng validation — 2026-08-10
 
@@ -23,12 +23,15 @@
 - Clean-copy chứa đúng 184 source file: `corepack pnpm install --frozen-lockfile --offline` không download package, giữ nguyên toàn bộ source hash; `corepack pnpm check` tiếp tục xanh với 170/170 tests.
 - `corepack pnpm check`: xanh; 19 workspace build, typecheck toàn workspace/E2E và root test suite đều đạt.
 - `corepack pnpm -r --if-present test`: xanh cho toàn bộ 19 workspace có script.
-- `corepack pnpm test:coverage`: xanh; 30 test files, 170 tests. Coverage toàn source: 70.25% statements, 61.93% branches, 76.34% functions, 70.53% lines; regression floor lần lượt 68%, 60%, 74%, 69%.
+- `corepack pnpm test:coverage`: xanh; 30 test files, 170 tests. Coverage toàn source: 70.2% statements, 61.8% branches, 76.34% functions, 70.48% lines; regression floor lần lượt 68%, 60%, 74%, 69%.
 - Vite và Next.js production builds: xanh; leak check không thấy `data-patchlens-id`, Inspector runtime hoặc PatchLens manifest.
 - `corepack pnpm release:dry-run`: xanh; build và kiểm 17 tarball, dependency closure, `dist` presence, source/test leak.
 - `corepack pnpm exec playwright test --list`: nhận đủ 2 browser tests.
 - `corepack pnpm test:e2e`: xanh; 2 Chromium tests xác nhận click-to-source và Codex managed edit qua Vite HMR, runner thoát sạch và không rò port `4311`.
 - URL boundary regression: CLI host và MCP daemon chỉ chấp nhận plain loopback HTTP origin; credential, path, query và fragment đều bị từ chối.
+- GitHub CI run `31404959642`: xanh trên Node `20.19.0`, Node `24` và Chromium E2E sau khi đổi Next fixture sang `next.config.mjs`.
+- Annotated tag `v0.1.0` trỏ tới commit `9d9494d`; GitHub Release dry-run `31405321455` xanh trên chính tag này.
+- npm registry preflight: cả 17 package version `0.1.0` chưa tồn tại; GitHub environment `npm` đã được tạo nhưng chưa có `NPM_TOKEN`.
 
 ## P0 — Engineering Baseline
 

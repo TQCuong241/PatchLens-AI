@@ -1,7 +1,7 @@
 # PatchLens AI Roadmap
 
 > Cập nhật: 2026-08-10
-> Trạng thái: source R0–R7, clean-copy frozen install, non-browser gate và Chromium E2E đã hoàn tất; release còn chờ merge commit, push/tag, publish và verify.
+> Trạng thái: source R0–R7, clean-copy frozen install, CI, tag `v0.1.0` và cloud release dry-run đã hoàn tất; release còn chờ repo administrator thêm `NPM_TOKEN`, publish và verify.
 
 ## 1. Trạng thái hiện tại
 
@@ -19,22 +19,22 @@
 
 ### Chưa có
 
-- Merge release candidate vào `main`, push và tạo tag từ commit đã qua gate.
-- npm publish cùng consumer-install verification; workflow mặc định chỉ dry-run.
+- GitHub environment `npm` chưa có secret `NPM_TOKEN`; tài khoản có quyền push không có quyền quản lý secret.
+- npm publish cùng consumer-install verification; workflow thật chưa thể chạy khi thiếu secret.
 
 ### Kết luận
 
-Critical path, clean-copy validation, non-browser validation và 2 Chromium E2E đã hoàn tất. Việc còn lại là chốt merge commit, push/tag, publish và verify package từ npm.
+Critical path, clean-copy validation, CI Node 20/24, 2 Chromium E2E, merge, push, tag và cloud dry-run đã hoàn tất. Việc còn lại là cấp release secret, publish dist-tag `next` và verify package từ npm.
 
 ## 2. Rủi ro cần xử lý sớm
 
 | Mức | Rủi ro | Tác động | Hướng xử lý |
 | --- | --- | --- | --- |
-| Cao | Merge commit và remote release ref chưa được chốt | Artifact publish có thể không ánh xạ tới một Git ref bất biến | Commit merge đã review, fetch lại remote, push rồi tag đúng commit xanh |
+| Cao | GitHub environment `npm` chưa có `NPM_TOKEN` | Workflow publish thật không thể xác thực với npm | Repo administrator thêm secret có quyền publish scope `@patchlens-ai`, không gửi token qua chat |
 | Cao | SDK Codex/Claude và Next.js còn ở version thay đổi nhanh | Minor update có thể đổi event hoặc option types | Lock exact resolution, typecheck và adapter contract tests |
 | Cao | Screenshot có thể chứa dữ liệu nhạy cảm dạng pixel | DOM sanitizer không bảo vệ screenshot | Hiển thị provider, giới hạn capture và yêu cầu người dùng tránh vùng nhạy cảm |
 | Trung bình | Whole-repository baseline tốn RAM/thời gian | Monorepo lớn có thể vượt 20,000 file hoặc 100 MB | Giữ bounded limit và bổ sung incremental watcher khi có số liệu |
-| Trung bình | Coverage toàn source mới đạt 70.25/61.93/76.34/70.53 | UI/runtime branch có thể hồi quy | Giữ regression floor 68/60/74/69, tăng test trước khi nâng floor |
+| Trung bình | Coverage toàn source mới đạt 70.2/61.8/76.34/70.48 | UI/runtime branch có thể hồi quy | Giữ regression floor 68/60/74/69, tăng test trước khi nâng floor |
 | Trung bình | 31 function dài hơn 50 dòng; `App` và Inspector runtime lớn | Tăng chi phí review và thay đổi | Tách state machine/UI/runtime module sau v0.1.0, giữ behavior tests trước refactor |
 | Trung bình | Package public chưa có release thực tế | Tarball đã kiểm chứng nhưng consumer install chưa có bằng chứng npm | Publish dist-tag `next`, cài thử từ npm rồi mới promote stable |
 

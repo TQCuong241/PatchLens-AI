@@ -1,7 +1,7 @@
 # PatchLens AI — Chỉ mục triển khai
 
 > Cập nhật: 2026-08-10
-> Trạng thái: source R0–R7, workspace gate và clean-copy frozen install đã hoàn tất; release còn theo dõi bằng task mở.
+> Trạng thái: source R0–R7, workspace/clean-copy gate, CI, tag và cloud dry-run đã hoàn tất; release còn theo dõi bằng task mở.
 
 Tài liệu này giữ đường dẫn tương thích cho đặc tả triển khai cũ. Nguồn sự thật hiện tại:
 

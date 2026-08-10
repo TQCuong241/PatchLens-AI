@@ -63,7 +63,7 @@ npm run patchlens
 ```
 
 > [!IMPORTANT]
-> Package chưa được phát hành lên npm. Source, clean-copy frozen install, non-browser gate và Chromium E2E đã đạt; release còn chờ merge commit, push/tag, publish và verify.
+> Package chưa được phát hành lên npm. Source, clean-copy frozen install, CI, tag `v0.1.0` và cloud release dry-run đã đạt; release còn chờ repo administrator thêm `NPM_TOKEN`, publish và verify.
 
 Quickstart chạy từ React + Vite repository sạch: [`docs/quickstart.md`](./docs/quickstart.md).
 
@@ -318,7 +318,7 @@ React + Vite
 
 ## Roadmap
 
-Trạng thái thực tế ngày **2026-08-10**: source R0–R7, clean-copy frozen install, `check`, coverage floor, production leak checks, release dry-run và 2 Chromium E2E đã đạt. Release còn chờ merge commit, push/tag, publish và verify.
+Trạng thái thực tế ngày **2026-08-10**: source R0–R7, clean-copy frozen install, CI Node 20/24, coverage floor, production leak checks, tag `v0.1.0`, cloud release dry-run và 2 Chromium E2E đã đạt. Release còn chờ `NPM_TOKEN`, publish dist-tag `next` và verify.
 
 - [x] **Phase 0 — Foundation:** pnpm monorepo, protocol v1, test/CI, Studio, daemon và demo app.
 - [x] **Phase 1 — Visual selection:** Vite compiler plugin, source manifest và Inspector.
@@ -382,7 +382,7 @@ PatchLens cung cấp phần ngữ cảnh còn thiếu để AI chuyển những 
 
 ## Trạng thái dự án
 
-PatchLens AI hiện ở giai đoạn **MVP release candidate**. 93/94 tracked tasks đã qua DoD; chỉ `REL-001` còn partial vì chưa push/tag, publish và verify package từ npm.
+PatchLens AI hiện ở giai đoạn **MVP release candidate**. 93/94 tracked tasks đã qua DoD; chỉ `REL-001` còn partial vì GitHub environment chưa có `NPM_TOKEN` và package chưa được publish/verify từ npm.
 
 Các API, command và package name trong README có thể thay đổi trong quá trình thử nghiệm.
 
