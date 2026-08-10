@@ -1,7 +1,7 @@
 # PatchLens AI Roadmap
 
 > Cập nhật: 2026-08-10
-> Trạng thái: source R0–R7, non-browser gate và Chromium E2E đã hoàn tất; release còn chờ clean-checkout install, commit và publish.
+> Trạng thái: source R0–R7, clean-copy frozen install, non-browser gate và Chromium E2E đã hoàn tất; release còn chờ merge commit, push/tag, publish và verify.
 
 ## 1. Trạng thái hiện tại
 
@@ -14,29 +14,29 @@
 - Mock, Codex và Claude managed providers; Codex attached mode qua MCP.
 - Vite/Next fixtures, unit/integration tests và Playwright Chromium E2E cho click-to-code cùng Codex/HMR.
 - Quickstart, security/privacy model, ADR và extension spikes.
-- `pnpm-lock.yaml`, frozen offline install, 19-workspace build/typecheck, 170 tests và production leak checks.
+- `pnpm-lock.yaml`, clean-copy frozen offline install giữ nguyên 184 source hash, 19-workspace build/typecheck, 170 tests và production leak checks.
 - Coverage toàn source có regression floor; release dry-run đã kiểm 17 tarball cùng dependency closure.
 
 ### Chưa có
 
-- Xác nhận frozen install trong checkout sạch và commit `pnpm-lock.yaml`.
-- npm publish; workflow mặc định chỉ dry-run.
+- Merge release candidate vào `main`, push và tạo tag từ commit đã qua gate.
+- npm publish cùng consumer-install verification; workflow mặc định chỉ dry-run.
 
 ### Kết luận
 
-Critical path, non-browser validation và 2 Chromium E2E đã hoàn tất. Việc còn lại là xác nhận checkout sạch, commit lockfile rồi mới publish.
+Critical path, clean-copy validation, non-browser validation và 2 Chromium E2E đã hoàn tất. Việc còn lại là chốt merge commit, push/tag, publish và verify package từ npm.
 
 ## 2. Rủi ro cần xử lý sớm
 
 | Mức | Rủi ro | Tác động | Hướng xử lý |
 | --- | --- | --- | --- |
-| Cao | Checkout sạch và lockfile commit chưa được xác nhận | Release có thể lệch với workspace hiện tại | Chạy frozen install trong checkout mới, review diff và commit lockfile |
+| Cao | Merge commit và remote release ref chưa được chốt | Artifact publish có thể không ánh xạ tới một Git ref bất biến | Commit merge đã review, fetch lại remote, push rồi tag đúng commit xanh |
 | Cao | SDK Codex/Claude và Next.js còn ở version thay đổi nhanh | Minor update có thể đổi event hoặc option types | Lock exact resolution, typecheck và adapter contract tests |
 | Cao | Screenshot có thể chứa dữ liệu nhạy cảm dạng pixel | DOM sanitizer không bảo vệ screenshot | Hiển thị provider, giới hạn capture và yêu cầu người dùng tránh vùng nhạy cảm |
 | Trung bình | Whole-repository baseline tốn RAM/thời gian | Monorepo lớn có thể vượt 20,000 file hoặc 100 MB | Giữ bounded limit và bổ sung incremental watcher khi có số liệu |
 | Trung bình | Coverage toàn source mới đạt 70.25/61.93/76.34/70.53 | UI/runtime branch có thể hồi quy | Giữ regression floor 68/60/74/69, tăng test trước khi nâng floor |
 | Trung bình | 31 function dài hơn 50 dòng; `App` và Inspector runtime lớn | Tăng chi phí review và thay đổi | Tách state machine/UI/runtime module sau v0.1.0, giữ behavior tests trước refactor |
-| Trung bình | Package public chưa có release thực tế | Tarball đã kiểm chứng nhưng consumer install chưa có bằng chứng npm | Chỉ publish sau E2E và clean-checkout gate |
+| Trung bình | Package public chưa có release thực tế | Tarball đã kiểm chứng nhưng consumer install chưa có bằng chứng npm | Publish dist-tag `next`, cài thử từ npm rồi mới promote stable |
 
 ## 3. Nguyên tắc thực thi
 

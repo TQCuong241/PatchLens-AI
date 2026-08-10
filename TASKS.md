@@ -13,13 +13,14 @@
 
 ## Gate còn lại
 
-1. Xác nhận `corepack pnpm install --frozen-lockfile` trong checkout sạch và commit `pnpm-lock.yaml`.
-2. Chạy lại `corepack pnpm check`, `corepack pnpm test:coverage`, `corepack pnpm test:e2e` và `corepack pnpm release:dry-run` trước publish.
-3. Chỉ đóng `REL-001` hoặc publish npm sau khi toàn bộ gate trên xanh.
+1. Hoàn tất merge commit, fetch lại remote rồi push đúng commit đã qua gate.
+2. Tạo tag release từ commit bất biến và publish 17 package với dist-tag `next`.
+3. Chỉ đóng `REL-001` sau khi cài thử package từ npm và verify version, dependency closure cùng provenance.
 
 ## Bằng chứng validation — 2026-08-10
 
 - `corepack pnpm install --frozen-lockfile --offline`: xanh trong workspace hiện tại.
+- Clean-copy chứa đúng 184 source file: `corepack pnpm install --frozen-lockfile --offline` không download package, giữ nguyên toàn bộ source hash; `corepack pnpm check` tiếp tục xanh với 170/170 tests.
 - `corepack pnpm check`: xanh; 19 workspace build, typecheck toàn workspace/E2E và root test suite đều đạt.
 - `corepack pnpm -r --if-present test`: xanh cho toàn bộ 19 workspace có script.
 - `corepack pnpm test:coverage`: xanh; 30 test files, 170 tests. Coverage toàn source: 70.25% statements, 61.93% branches, 76.34% functions, 70.53% lines; regression floor lần lượt 68%, 60%, 74%, 69%.
@@ -31,7 +32,7 @@
 
 ## P0 — Engineering Baseline
 
-- [~] `FND-001` Tạo và commit `pnpm-lock.yaml`; xác nhận install bằng Corepack trên môi trường sạch.
+- [x] `FND-001` Tạo và commit `pnpm-lock.yaml`; xác nhận frozen offline install bằng Corepack trên clean-copy độc lập.
 - [x] `FND-002` Tạo workspace tối thiểu: `apps/studio`, `apps/daemon`, `examples/react-vite-demo`.
 - [x] `FND-003` Tạo package critical path: `compiler-vite`, `inspector-runtime`, `selection-engine`, `source-mapper`.
 - [x] `FND-004` Thêm Vitest config, script test cho từng package và root coverage command.
