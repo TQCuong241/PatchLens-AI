@@ -15,7 +15,7 @@
 
 1. Tạo npm organization `patchlens-ai`, thêm tài khoản publisher và xác nhận quyền write cho scope `@patchlens-ai`.
 2. Repo administrator thêm `NPM_TOKEN` vào GitHub environment `npm`; tài khoản có quyền push không thể quản lý environment secret.
-3. Sau khi CI xanh, tạo annotated tag `v0.1.1` và dispatch workflow `Release` với `dry_run=false`, dist-tag `next`.
+3. Dispatch workflow `Release` trên annotated tag `v0.1.1` với `dry_run=false`, dist-tag `next`.
 4. Chạy `corepack pnpm release:verify -- --tag next`; chỉ đóng `REL-001` khi đủ 17 package, dependency closure, integrity và provenance đều đạt.
 
 ## Bằng chứng validation — 2026-08-11
@@ -30,8 +30,8 @@
 - `corepack pnpm exec playwright test --list`: nhận đủ 2 browser tests.
 - `corepack pnpm test:e2e`: xanh; 2 Chromium tests xác nhận click-to-source và Codex managed edit qua Vite HMR, runner thoát sạch và không rò port `4311`.
 - URL boundary regression: CLI host và MCP daemon chỉ chấp nhận plain loopback HTTP origin; credential, path, query và fragment đều bị từ chối.
-- GitHub CI run `31449268858`: xanh trên Node `20.19.0`, Node `24`, Node 24 artifact/consumer smoke và Chromium E2E; workflow dùng `actions/checkout@v7` cùng `actions/setup-node@v7`.
-- Annotated tag `v0.1.0` vẫn bất biến tại commit `9d9494d`; hardening mới dùng version candidate `0.1.1` và release workflow từ chối branch, lightweight tag, tag/version mismatch hoặc tag/commit mismatch.
+- GitHub CI run `31449419396`: xanh trên Node `20.19.0`, Node `24`, Node 24 artifact/consumer smoke và Chromium E2E; workflow dùng `actions/checkout@v7` cùng `actions/setup-node@v7`.
+- Annotated tag `v0.1.0` vẫn bất biến tại commit `9d9494d`; annotated tag `v0.1.1` trỏ commit `6ad1883`. Release dry-run `31449565409` xanh trên chính tag mới; workflow từ chối branch, lightweight tag, tag/version mismatch hoặc tag/commit mismatch.
 - npm registry preflight: `npm org ls patchlens-ai` trả `E404 Scope not found` ngày 2026-08-11, máy hiện tại trả `ENEEDAUTH`, GitHub environment `npm` chưa có `NPM_TOKEN` và tài khoản `thhongphuc` chỉ có role `write`.
 - `release:verify` đã qua mock registry đủ 17 package; success path kiểm integrity, dist-tag, dependency closure, tarball leak và provenance. Production dependency audit, secret scan, tracked artifact scan và conflict-marker scan đều sạch.
 - Inspector, daemon, Codex và Claude error paths có regression test cho npm/GitHub/AWS credential, `key=value` secret và Windows/slash-normalized project root redaction.

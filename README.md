@@ -63,7 +63,7 @@ npm run patchlens
 ```
 
 > [!IMPORTANT]
-> Package chưa được phát hành lên npm. Release candidate `0.1.1` đã qua clean-copy frozen offline install, Node 20.19/24, 176 tests, 2 Chromium E2E và offline consumer smoke cho 17 tarball; publish còn chờ npm organization `patchlens-ai`, `NPM_TOKEN` và registry verification.
+> Package chưa được phát hành lên npm. Annotated tag `v0.1.1` đã qua clean-copy frozen offline install, local/GitHub CI Node 20.19/24, 176 tests, 2 Chromium E2E và cloud dry-run với 17-package consumer smoke; publish còn chờ npm organization `patchlens-ai`, `NPM_TOKEN` và registry verification.
 
 Quickstart chạy từ React + Vite repository sạch: [`docs/quickstart.md`](./docs/quickstart.md).
 
@@ -318,7 +318,7 @@ React + Vite
 
 ## Roadmap
 
-Trạng thái thực tế ngày **2026-08-11**: source R0–R7 và release candidate `0.1.1` đã qua clean-copy frozen offline install với 190 repository file giữ nguyên hash, Node 20.19/24 checks, 176 tests, coverage floor, production leak checks, 17-package artifact/consumer smoke và 2 Chromium E2E. Release còn chờ tạo npm organization `patchlens-ai`, cấp `NPM_TOKEN`, publish dist-tag `next` và verify từ registry.
+Trạng thái thực tế ngày **2026-08-11**: source R0–R7 và annotated tag `v0.1.1` đã qua clean-copy frozen offline install với 190 repository file giữ nguyên hash, local/GitHub CI Node 20.19/24, 176 tests, coverage floor, production leak checks, 17-package artifact/consumer smoke, release ref guard và 2 Chromium E2E. Release còn chờ tạo npm organization `patchlens-ai`, cấp `NPM_TOKEN`, publish dist-tag `next` và verify từ registry.
 
 - [x] **Phase 0 — Foundation:** pnpm monorepo, protocol v1, test/CI, Studio, daemon và demo app.
 - [x] **Phase 1 — Visual selection:** Vite compiler plugin, source manifest và Inspector.
