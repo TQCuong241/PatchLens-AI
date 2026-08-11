@@ -47,7 +47,7 @@ corepack pnpm test:e2e
 corepack pnpm release:dry-run
 ```
 
-`release:dry-run` phải kiểm đủ 17 tarball, dependency closure, source/test leak, consumer lock resolution rồi frozen offline install, public exports và binary `patchlens --help`. Xác nhận CI Node `20.19.0`, Node `24` và Chromium E2E xanh trên commit được tag.
+`release:dry-run` phải kiểm đủ 17 tarball, dependency closure, source/test leak, consumer lock resolution/dependency fetch rồi frozen offline install, public exports và binary `patchlens --help`. Xác nhận CI Node `20.19.0`, Node `24` và Chromium E2E xanh trên commit được tag.
 
 ## 4. Cloud dry-run
 

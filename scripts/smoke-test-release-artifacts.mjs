@@ -83,6 +83,20 @@ try {
     [
       ...corepackCommand.arguments,
       'pnpm',
+      'fetch',
+      '--prod',
+      '--store-dir',
+      resolve(repositoryRoot, '.pnpm-store'),
+    ],
+    consumerRoot,
+    'Consumer dependency fetch',
+  );
+
+  runCommand(
+    corepackCommand.executable,
+    [
+      ...corepackCommand.arguments,
+      'pnpm',
       'install',
       '--offline',
       '--frozen-lockfile',

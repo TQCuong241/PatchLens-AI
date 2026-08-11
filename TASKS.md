@@ -26,7 +26,7 @@
 - `corepack pnpm -r --if-present test`: xanh cho toàn bộ 19 workspace có script.
 - `corepack pnpm test:coverage`: xanh; 32 test files, 176 tests. Coverage toàn source: 70.19% statements, 61.77% branches, 76.34% functions, 70.47% lines; regression floor lần lượt 68%, 60%, 74%, 69%.
 - Vite và Next.js production builds: xanh; leak check không thấy `data-patchlens-id`, Inspector runtime hoặc PatchLens manifest.
-- `corepack pnpm release:dry-run`: xanh cho `0.1.1`; build và kiểm 17 tarball, dependency closure, `dist` presence, source/test leak, consumer lock resolution rồi frozen offline install, public imports và binary `patchlens --help`.
+- `corepack pnpm release:dry-run`: xanh cho `0.1.1`; build và kiểm 17 tarball, dependency closure, `dist` presence, source/test leak, consumer lock resolution/dependency fetch rồi frozen offline install, public imports và binary `patchlens --help`.
 - `corepack pnpm exec playwright test --list`: nhận đủ 2 browser tests.
 - `corepack pnpm test:e2e`: xanh; 2 Chromium tests xác nhận click-to-source và Codex managed edit qua Vite HMR, runner thoát sạch và không rò port `4311`.
 - URL boundary regression: CLI host và MCP daemon chỉ chấp nhận plain loopback HTTP origin; credential, path, query và fragment đều bị từ chối.
