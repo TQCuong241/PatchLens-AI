@@ -68,7 +68,24 @@ try {
       ...corepackCommand.arguments,
       'pnpm',
       'install',
+      '--lockfile-only',
+      '--prefer-offline',
+      '--ignore-scripts',
+      '--store-dir',
+      resolve(repositoryRoot, '.pnpm-store'),
+    ],
+    consumerRoot,
+    'Consumer lockfile resolution',
+  );
+
+  runCommand(
+    corepackCommand.executable,
+    [
+      ...corepackCommand.arguments,
+      'pnpm',
+      'install',
       '--offline',
+      '--frozen-lockfile',
       '--ignore-scripts',
       '--store-dir',
       resolve(repositoryRoot, '.pnpm-store'),

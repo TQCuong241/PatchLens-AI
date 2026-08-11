@@ -15,7 +15,7 @@
 - Vite/Next fixtures, unit/integration tests và Playwright Chromium E2E cho click-to-code cùng Codex/HMR.
 - Quickstart, security/privacy model, ADR và extension spikes.
 - `pnpm-lock.yaml`, clean-copy frozen offline install giữ nguyên hash của 190 repository file, 19-workspace build/typecheck, 176 tests và production leak checks.
-- Coverage toàn source có regression floor; release dry-run kiểm 17 tarball, dependency closure, offline consumer install, public exports và `patchlens --help` qua binary shim.
+- Coverage toàn source có regression floor; release dry-run kiểm 17 tarball, dependency closure, consumer lock resolution rồi frozen offline install, public exports và `patchlens --help` qua binary shim.
 - Post-publish verifier kiểm npm dist-tag, internal dependency closure, tarball integrity, source leak và provenance cho đủ 17 package.
 
 ### Chưa có
