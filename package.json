@@ -1,6 +1,6 @@
 {
   "name": "patchlens-ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Local visual context layer for AI coding agents.",
@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "release:check": "node scripts/check-release-metadata.mjs",
-    "release:dry-run": "corepack pnpm release:check && corepack pnpm build:packages && node scripts/dry-run-release.mjs",
+    "release:dry-run": "corepack pnpm release:check && corepack pnpm build:packages && node scripts/dry-run-release.mjs && node scripts/smoke-test-release-artifacts.mjs",
+    "release:ref-check": "node scripts/check-release-ref.mjs",
     "release:verify": "node scripts/verify-published-release.mjs",
     "test:e2e": "node scripts/check-playwright-browser.mjs && corepack pnpm build:packages && playwright test",
     "test:coverage": "corepack pnpm build:packages && vitest run --coverage",

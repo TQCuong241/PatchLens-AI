@@ -159,8 +159,12 @@ describe('CodexCodingProvider', () => {
 
   it('maps auth failure and redacts project root', async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'patchlens-codex-'));
+    const fakeNpmToken = ['npm', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('_');
+    const normalizedRoot = projectRoot.replaceAll('\\', '/');
     const provider = new CodexCodingProvider({
-      codex: new FakeCodexClient(new FailingThread(`401 Unauthorized at ${projectRoot}`)),
+      codex: new FakeCodexClient(
+        new FailingThread(`401 Unauthorized at ${normalizedRoot} token=secret ${fakeNpmToken}`),
+      ),
     });
     const session = await provider.createSession({
       projectId: 'project-1',
@@ -171,7 +175,11 @@ describe('CodexCodingProvider', () => {
     const error = events.find((event) => event.type === 'error');
 
     expect(error).toMatchObject({ payload: { code: 'codex_auth_failed' } });
-    expect(JSON.stringify(error)).not.toContain(projectRoot);
+    const serialized = JSON.stringify(error);
+    expect(serialized).not.toContain(projectRoot);
+    expect(serialized).not.toContain(normalizedRoot);
+    expect(serialized).not.toContain('secret');
+    expect(serialized).not.toContain(fakeNpmToken);
     expect(session.activeSelectionId).toBeUndefined();
   });
 

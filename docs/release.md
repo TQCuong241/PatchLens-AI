@@ -1,11 +1,12 @@
 # PatchLens AI Release Runbook
 
-> Cập nhật: 2026-08-10
+> Cập nhật: 2026-08-11
 > Phạm vi: publish các package public bằng GitHub Actions, provenance và npm dist-tag.
 
 ## 1. Invariant
 
 - Chỉ publish từ annotated Git tag trỏ tới commit đã qua CI.
+- Workflow từ chối branch, lightweight tag, tag khác `v${package.version}` và tag không trỏ đúng `GITHUB_SHA`.
 - Không force-push hoặc di chuyển tag đã công bố.
 - Không gửi npm token qua chat, commit, log hoặc command-line argument.
 - Mọi package public phải dùng cùng version và giữ `publishConfig.provenance=true`.
@@ -38,7 +39,7 @@ Command phải đọc secret từ prompt hoặc stdin; không đặt token trự
 ```bash
 git fetch --prune --tags origin
 git status --short --branch
-git show --no-patch v0.1.0
+git show --no-patch v0.1.1
 corepack pnpm install --frozen-lockfile
 corepack pnpm check
 corepack pnpm test:coverage
@@ -46,31 +47,31 @@ corepack pnpm test:e2e
 corepack pnpm release:dry-run
 ```
 
-Xác nhận CI Node `20.19.0`, Node `24` và Chromium E2E xanh trên commit được tag.
+`release:dry-run` phải kiểm đủ 17 tarball, dependency closure, source/test leak, offline consumer install, public exports và binary `patchlens --help`. Xác nhận CI Node `20.19.0`, Node `24` và Chromium E2E xanh trên commit được tag.
 
 ## 4. Cloud dry-run
 
 ```bash
 gh workflow run release.yml \
   --repo TQCuong241/PatchLens-AI \
-  --ref v0.1.0 \
+  --ref v0.1.1 \
   -f dry_run=true \
   -f tag=next
 ```
 
-Chỉ tiếp tục khi workflow checkout đúng tag và dry-run tạo đủ 17 tarball.
+Chỉ tiếp tục khi workflow checkout đúng annotated tag, `release:ref-check` đạt và dry-run tạo/cài thử đủ 17 tarball.
 
 ## 5. Publish
 
 ```bash
 gh workflow run release.yml \
   --repo TQCuong241/PatchLens-AI \
-  --ref v0.1.0 \
+  --ref v0.1.1 \
   -f dry_run=false \
   -f tag=next
 ```
 
-Không chạy song song hai workflow publish cho cùng version.
+Không chạy song song hai workflow publish cho cùng version. Real publish luôn chạy lại toàn bộ `release:dry-run` trước `pnpm publish`.
 
 ## 6. Verify
 

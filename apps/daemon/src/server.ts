@@ -140,7 +140,7 @@ async function createHealth(api: DaemonApi): Promise<DaemonHealth> {
   return {
     ok: true,
     service: 'patchlens-daemon',
-    version: '0.1.0',
+    version: '0.1.1',
     protocolVersion: PATCHLENS_PROTOCOL_VERSION,
     providers: providers.map(({ id, status }) => ({ id, status })),
   };

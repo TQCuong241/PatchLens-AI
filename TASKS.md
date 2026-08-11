@@ -1,6 +1,6 @@
 # PatchLens AI Tasks
 
-> Cập nhật: 2026-08-10
+> Cập nhật: 2026-08-11
 > Quy ước ưu tiên: `P0` chặn critical path, `P1` cần cho MVP, `P2` mở rộng.
 > Trạng thái: `[x]` đã qua DoD, `[~]` đã qua source/unit gate nhưng còn phụ thuộc browser hoặc release gate, `[ ]` chưa triển khai.
 
@@ -15,25 +15,26 @@
 
 1. Tạo npm organization `patchlens-ai`, thêm tài khoản publisher và xác nhận quyền write cho scope `@patchlens-ai`.
 2. Repo administrator thêm `NPM_TOKEN` vào GitHub environment `npm`; tài khoản có quyền push không thể quản lý environment secret.
-3. Dispatch workflow `Release` trên tag `v0.1.0` với `dry_run=false` và dist-tag `next`.
+3. Sau khi CI xanh, tạo annotated tag `v0.1.1` và dispatch workflow `Release` với `dry_run=false`, dist-tag `next`.
 4. Chạy `corepack pnpm release:verify -- --tag next`; chỉ đóng `REL-001` khi đủ 17 package, dependency closure, integrity và provenance đều đạt.
 
-## Bằng chứng validation — 2026-08-10
+## Bằng chứng validation — 2026-08-11
 
 - `corepack pnpm install --frozen-lockfile --offline`: xanh trong workspace hiện tại.
-- Clean-copy chứa đúng 187 source file: `corepack pnpm install --frozen-lockfile --offline` không download package, giữ nguyên toàn bộ source hash; `corepack pnpm check` tiếp tục xanh với 172/172 tests.
-- `corepack pnpm check`: xanh; 19 workspace build, typecheck toàn workspace/E2E và root test suite đều đạt.
+- Clean-copy chứa đúng 190 repository file: frozen offline install tải 0 package, giữ nguyên toàn bộ SHA-256; `corepack pnpm check` tiếp tục xanh với 176/176 tests.
+- `corepack pnpm check`: xanh trên Node `20.19.0` và Node `24.18.1`; 19 workspace build, typecheck toàn workspace/E2E và root test suite đều đạt.
 - `corepack pnpm -r --if-present test`: xanh cho toàn bộ 19 workspace có script.
-- `corepack pnpm test:coverage`: xanh; 31 test files, 172 tests. Coverage toàn source: 70.2% statements, 61.8% branches, 76.34% functions, 70.48% lines; regression floor lần lượt 68%, 60%, 74%, 69%.
+- `corepack pnpm test:coverage`: xanh; 32 test files, 176 tests. Coverage toàn source: 70.19% statements, 61.77% branches, 76.34% functions, 70.47% lines; regression floor lần lượt 68%, 60%, 74%, 69%.
 - Vite và Next.js production builds: xanh; leak check không thấy `data-patchlens-id`, Inspector runtime hoặc PatchLens manifest.
-- `corepack pnpm release:dry-run`: xanh; build và kiểm 17 tarball, dependency closure, `dist` presence, source/test leak.
+- `corepack pnpm release:dry-run`: xanh cho `0.1.1`; build và kiểm 17 tarball, dependency closure, `dist` presence, source/test leak, offline consumer install, public imports và binary `patchlens --help`.
 - `corepack pnpm exec playwright test --list`: nhận đủ 2 browser tests.
 - `corepack pnpm test:e2e`: xanh; 2 Chromium tests xác nhận click-to-source và Codex managed edit qua Vite HMR, runner thoát sạch và không rò port `4311`.
 - URL boundary regression: CLI host và MCP daemon chỉ chấp nhận plain loopback HTTP origin; credential, path, query và fragment đều bị từ chối.
-- GitHub CI run `31404959642`: xanh trên Node `20.19.0`, Node `24` và Chromium E2E sau khi đổi Next fixture sang `next.config.mjs`.
-- Annotated tag `v0.1.0` trỏ tới commit `9d9494d`; GitHub Release dry-run `31405321455` xanh trên chính tag này.
-- npm registry preflight: cả 17 package version `0.1.0` chưa tồn tại; `npm org ls patchlens-ai` trả `E404 Scope not found`, máy hiện tại trả `ENEEDAUTH`, GitHub environment `npm` đã được tạo nhưng chưa có `NPM_TOKEN`.
-- `release:verify` đã qua mock registry đủ 17 package; success path kiểm integrity, dist-tag, dependency closure, tarball leak và provenance; Node 20/24 đều xử lý đúng prepublish failure.
+- Bằng chứng cloud gần nhất: GitHub CI run `31409105868` xanh trên Node `20.19.0`, Node `24` và Chromium E2E; workflow hiện dùng `actions/checkout@v7`, `actions/setup-node@v7` và chạy artifact smoke trên Node 24.
+- Annotated tag `v0.1.0` vẫn bất biến tại commit `9d9494d`; hardening mới dùng version candidate `0.1.1` và release workflow từ chối branch, lightweight tag, tag/version mismatch hoặc tag/commit mismatch.
+- npm registry preflight: `npm org ls patchlens-ai` trả `E404 Scope not found` ngày 2026-08-11, máy hiện tại trả `ENEEDAUTH`, GitHub environment `npm` chưa có `NPM_TOKEN` và tài khoản `thhongphuc` chỉ có role `write`.
+- `release:verify` đã qua mock registry đủ 17 package; success path kiểm integrity, dist-tag, dependency closure, tarball leak và provenance. Production dependency audit, secret scan, tracked artifact scan và conflict-marker scan đều sạch.
+- Inspector, daemon, Codex và Claude error paths có regression test cho npm/GitHub/AWS credential, `key=value` secret và Windows/slash-normalized project root redaction.
 
 ## P0 — Engineering Baseline
 

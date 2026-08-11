@@ -707,6 +707,10 @@ function sanitizeDaemonError(error: unknown, projectRoot: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]')
     .replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, '[REDACTED_API_KEY]')
     .replace(
+      /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|npm_[A-Za-z0-9]{20,})\b/g,
+      '[REDACTED_CREDENTIAL]',
+    )
+    .replace(
       /\b(authorization|cookie|csrf|token|password|secret|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
       '$1=[REDACTED]',
     )

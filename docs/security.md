@@ -139,7 +139,7 @@ Attached coding agent vẫn giữ permission model riêng. PatchLens MCP chỉ c
 - Browser console capture chỉ giữ bounded warning/error entries trong memory.
 - Daemon token và provider credential không được log.
 - CLI in one-time Studio login URL có access token để người dùng mở giao diện. Xem terminal output và browser history của URL này là dữ liệu nhạy cảm.
-- Provider và daemon errors redact project root, bearer token, API-key-like value và credential assignment.
+- Provider và daemon errors redact Windows/slash-normalized project root, bearer token, `sk-*`/`sk-ant-*` key, AWS access key ID, GitHub/npm token và credential assignment.
 - Session, thread và selection history hiện chỉ sống trong memory.
 - SQLite persistence chưa bật; xem `docs/spikes/sqlite-history.md`.
 

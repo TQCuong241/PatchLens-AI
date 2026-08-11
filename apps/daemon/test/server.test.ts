@@ -21,6 +21,7 @@ import type { DaemonServer } from '../src/server.js';
 
 let activeServer: DaemonServer | undefined;
 let projectRoot: string | undefined;
+const fakeNpmToken = ['npm', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('_');
 
 afterEach(async () => {
   await activeServer?.stop();
@@ -362,6 +363,7 @@ describe('PatchLens daemon security boundary', () => {
     expect(body).toContain('Bearer [REDACTED]');
     expect(body).not.toContain(projectRoot);
     expect(body).not.toContain('provider-secret-value');
+    expect(body).not.toContain(fakeNpmToken);
   });
 
   it('keeps partial provider edits revertible after a terminal error', async () => {
@@ -601,7 +603,7 @@ function createFailingProvider(root: string): CodingProvider {
     },
     async *sendMessage() {
       yield* [];
-      throw new Error(`${root} Bearer provider-secret-value`);
+      throw new Error(`${root.replaceAll('\\', '/')} Bearer provider-secret-value ${fakeNpmToken}`);
     },
     async cancel() {},
     async dispose() {},

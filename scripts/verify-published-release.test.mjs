@@ -10,6 +10,10 @@ import { describe, expect, it } from 'vitest';
 
 import { verifyPublishedRelease } from './verify-published-release.mjs';
 
+const releaseVersion = JSON.parse(
+  await readFile(resolve(import.meta.dirname, '..', 'package.json'), 'utf8'),
+).version;
+
 describe('verifyPublishedRelease', () => {
   it('verifies every publishable package through registry metadata and tarballs', async () => {
     await withMockRegistry({}, async (registry, expectedCount) => {
@@ -20,7 +24,7 @@ describe('verifyPublishedRelease', () => {
         pollMs: 10,
       });
 
-      expect(result).toMatchObject({ ok: true, tag: 'next', version: '0.1.0' });
+      expect(result).toMatchObject({ ok: true, tag: 'next', version: releaseVersion });
       expect(expectedCount).toBe(17);
       expect(result.packages).toHaveLength(expectedCount);
       expect(result.packages.every((entry) => entry.attestations > 0)).toBe(true);

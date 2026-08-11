@@ -815,11 +815,21 @@ function mapClaudeFailure(
 function sanitizeProviderMessage(message: string, projectRoot?: string): string {
   let sanitized = message;
   if (projectRoot) {
-    sanitized = sanitized.replaceAll(projectRoot, '[PROJECT_ROOT]');
+    for (const root of new Set([projectRoot, projectRoot.replaceAll('\\', '/')])) {
+      sanitized = sanitized.replaceAll(root, '[PROJECT_ROOT]');
+    }
   }
   return sanitized
     .replace(/\bsk-ant-[A-Za-z0-9_-]{12,}\b/g, '[REDACTED_API_KEY]')
     .replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]')
+    .replace(
+      /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|npm_[A-Za-z0-9]{20,})\b/g,
+      '[REDACTED_CREDENTIAL]',
+    )
+    .replace(
+      /\b(authorization|cookie|credential|csrf|token|password|private[_-]?key|secret|session(?:[_-]?id)?|signature|access[_-]?key|api[_-]?key|client[_-]?secret)\s*[:=]\s*[^\s,;]+/gi,
+      '$1=[REDACTED]',
+    )
     .slice(0, PATCHLENS_PROTOCOL_LIMITS.textLength);
 }
 

@@ -46,15 +46,17 @@ describe('Inspector DOM sanitization', () => {
   it('redacts session, signed URL, and provider credential patterns', () => {
     const link = document.createElement('a');
     const fakeGithubToken = ['ghp', 'abcdefghijklmnopqrstuvwxyz123456'].join('_');
+    const fakeNpmToken = ['npm', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('_');
     link.setAttribute('data-session-id', 'session-value');
     link.href = 'https://example.test/file?X-Amz-Signature=signed-value';
-    link.textContent = fakeGithubToken;
+    link.textContent = `${fakeGithubToken} ${fakeNpmToken}`;
 
     const sanitized = sanitizeElementHtml(link);
 
     expect(sanitized).not.toContain('session-value');
     expect(sanitized).not.toContain('signed-value');
     expect(sanitized).not.toContain(fakeGithubToken);
+    expect(sanitized).not.toContain(fakeNpmToken);
     expect(sanitized).toContain('[REDACTED]');
   });
 });

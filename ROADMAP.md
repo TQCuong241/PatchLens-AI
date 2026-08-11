@@ -1,7 +1,7 @@
 # PatchLens AI Roadmap
 
-> Cập nhật: 2026-08-10
-> Trạng thái: source R0–R7, clean-copy frozen install, CI, tag `v0.1.0` và cloud release dry-run đã hoàn tất; release còn chờ tạo npm organization `patchlens-ai`, repo administrator thêm `NPM_TOKEN`, publish và verify.
+> Cập nhật: 2026-08-11
+> Trạng thái: source R0–R7 và release candidate `0.1.1` đã qua clean-copy frozen offline install, Node 20.19/24, coverage, 2 Chromium E2E và 17-package artifact/consumer smoke; npm release còn chờ tạo organization `patchlens-ai`, repo administrator thêm `NPM_TOKEN`, publish và verify.
 
 ## 1. Trạng thái hiện tại
 
@@ -14,19 +14,19 @@
 - Mock, Codex và Claude managed providers; Codex attached mode qua MCP.
 - Vite/Next fixtures, unit/integration tests và Playwright Chromium E2E cho click-to-code cùng Codex/HMR.
 - Quickstart, security/privacy model, ADR và extension spikes.
-- `pnpm-lock.yaml`, clean-copy frozen offline install giữ nguyên 187 source hash, 19-workspace build/typecheck, 172 tests và production leak checks.
-- Coverage toàn source có regression floor; release dry-run đã kiểm 17 tarball cùng dependency closure.
+- `pnpm-lock.yaml`, clean-copy frozen offline install giữ nguyên hash của 190 repository file, 19-workspace build/typecheck, 176 tests và production leak checks.
+- Coverage toàn source có regression floor; release dry-run kiểm 17 tarball, dependency closure, offline consumer install, public exports và `patchlens --help` qua binary shim.
 - Post-publish verifier kiểm npm dist-tag, internal dependency closure, tarball integrity, source leak và provenance cho đủ 17 package.
 
 ### Chưa có
 
-- npm organization/scope `patchlens-ai` chưa tồn tại; registry trả `E404 Scope not found` ngày 2026-08-10 và máy hiện tại chưa đăng nhập npm.
+- npm organization/scope `patchlens-ai` chưa tồn tại; registry trả `E404 Scope not found` ngày 2026-08-11 và máy hiện tại chưa đăng nhập npm.
 - GitHub environment `npm` chưa có secret `NPM_TOKEN`; tài khoản có quyền push không có quyền quản lý secret.
-- npm publish cùng consumer-install verification; workflow thật chưa thể chạy khi thiếu secret.
+- npm publish cùng consumer-install verification từ registry; local tarball consumer smoke đã đạt nhưng workflow thật chưa thể publish khi thiếu secret.
 
 ### Kết luận
 
-Critical path, clean-copy validation, CI Node 20/24, 2 Chromium E2E, merge, push, tag và cloud dry-run đã hoàn tất. Việc còn lại là tạo npm organization, cấp release secret, publish dist-tag `next` và verify package từ npm.
+Critical path, clean-copy validation, local Node 20.19/24 gates, 2 Chromium E2E và release candidate `0.1.1` artifact smoke đã hoàn tất. Tag `v0.1.0` vẫn bất biến tại release candidate cũ; việc còn lại là xác nhận CI cho commit mới, tạo tag `v0.1.1`, tạo npm organization, cấp release secret, publish dist-tag `next` và verify package từ npm.
 
 ## 2. Rủi ro cần xử lý sớm
 
@@ -37,9 +37,9 @@ Critical path, clean-copy validation, CI Node 20/24, 2 Chromium E2E, merge, push
 | Cao | SDK Codex/Claude và Next.js còn ở version thay đổi nhanh | Minor update có thể đổi event hoặc option types | Lock exact resolution, typecheck và adapter contract tests |
 | Cao | Screenshot có thể chứa dữ liệu nhạy cảm dạng pixel | DOM sanitizer không bảo vệ screenshot | Hiển thị provider, giới hạn capture và yêu cầu người dùng tránh vùng nhạy cảm |
 | Trung bình | Whole-repository baseline tốn RAM/thời gian | Monorepo lớn có thể vượt 20,000 file hoặc 100 MB | Giữ bounded limit và bổ sung incremental watcher khi có số liệu |
-| Trung bình | Coverage toàn source mới đạt 70.2/61.8/76.34/70.48 | UI/runtime branch có thể hồi quy | Giữ regression floor 68/60/74/69, tăng test trước khi nâng floor |
-| Trung bình | 31 function dài hơn 50 dòng; `App` và Inspector runtime lớn | Tăng chi phí review và thay đổi | Tách state machine/UI/runtime module sau v0.1.0, giữ behavior tests trước refactor |
-| Trung bình | Package public chưa có release thực tế | Tarball đã kiểm chứng nhưng consumer install chưa có bằng chứng npm | Publish dist-tag `next`, cài thử từ npm rồi mới promote stable |
+| Trung bình | Coverage toàn source mới đạt 70.19/61.77/76.34/70.47 | UI/runtime branch có thể hồi quy | Giữ regression floor 68/60/74/69, tăng test trước khi nâng floor |
+| Trung bình | 31 function dài hơn 50 dòng; `App` và Inspector runtime lớn | Tăng chi phí review và thay đổi | Tách state machine/UI/runtime module sau v0.1.1, giữ behavior tests trước refactor |
+| Trung bình | Package public chưa có release thực tế | Local tarball và offline consumer đã kiểm chứng nhưng chưa có bằng chứng cài từ npm | Publish dist-tag `next`, cài thử từ npm rồi mới promote stable |
 
 ## 3. Nguyên tắc thực thi
 
@@ -191,14 +191,14 @@ Phạm vi:
 
 | Milestone | Trạng thái | Bằng chứng chính | Còn lại |
 | --- | --- | --- | --- |
-| R0 | Partial release gate | Frozen offline install hiện tại; `pnpm check`; recursive workspace tests; coverage floor | Checkout sạch và commit lockfile |
+| R0 | Đạt | Clean-copy frozen offline install; Node 20.19/24 `pnpm check`; recursive workspace tests; coverage floor | Không |
 | R1 | Đạt | Compiler/manifest tests, Inspector jsdom tests, Vite production leak check và Playwright click selection | Không |
 | R2 | Đạt | Selection ranking, multi-select, remount, Studio message-channel và context tests | Không |
 | R3 | Đạt | Daemon auth/origin, project path, transaction conflict/undo và lifecycle tests | Không |
 | R4 | Đạt | Codex adapter contract, daemon managed-edit integration, cancel/dispose/error tests và Playwright Codex/HMR | Không |
-| R5 | Đạt non-browser gate | CLI init/dev/doctor tests, Vite/Next production builds, visual verifier tests | Publish chờ release gate |
+| R5 | Đạt source và artifact gate | CLI init/dev/doctor tests, Vite/Next production builds, visual verifier tests, 17-package consumer smoke | Publish chờ release gate |
 | R6 | Đạt | MCP session/service, permission, stale selection và source-boundary tests | Không |
-| R7 | Đạt theo phạm vi | Claude adapter, Next compiler, cross-origin design và SQLite evaluation | Refactor/coverage tăng dần hậu v0.1.0 |
+| R7 | Đạt theo phạm vi | Claude adapter, Next compiler, cross-origin design và SQLite evaluation | Refactor/coverage tăng dần hậu v0.1.1 |
 
 ## 6. Thứ tự critical path
 

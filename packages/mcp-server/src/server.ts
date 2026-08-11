@@ -15,7 +15,7 @@ export type StartPatchLensMcpServerOptions = {
 const verificationCommandSchema = z.enum(['typecheck', 'lint', 'test', 'build']);
 
 export function createPatchLensMcpServer(service: PatchLensContextService): McpServer {
-  const server = new McpServer({ name: 'patchlens-ai', version: '0.1.0' });
+  const server = new McpServer({ name: 'patchlens-ai', version: '0.1.1' });
 
   server.registerResource(
     'active-selection',

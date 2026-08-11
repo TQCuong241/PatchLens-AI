@@ -35,7 +35,7 @@ export async function runPatchLensCli(
     return 0;
   }
   if (command === '--version' || command === '-v') {
-    io.stdout('0.1.0');
+    io.stdout('0.1.1');
     return 0;
   }
 

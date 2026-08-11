@@ -214,9 +214,13 @@ describe('ClaudeCodingProvider', () => {
 
   it('maps auth failures and redacts project root', async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'patchlens-claude-'));
+    const fakeGithubToken = ['github', 'pat', 'abcdefghijklmnopqrstuvwxyz123456'].join('_');
+    const normalizedRoot = projectRoot.replaceAll('\\', '/');
     const provider = new ClaudeCodingProvider({
       query: () => {
-        throw new Error(`authentication_failed at ${projectRoot}`);
+        throw new Error(
+          `authentication_failed at ${normalizedRoot} password=secret ${fakeGithubToken}`,
+        );
       },
     });
     const session = await provider.createSession({
@@ -228,7 +232,11 @@ describe('ClaudeCodingProvider', () => {
     const error = events.find((event) => event.type === 'error');
 
     expect(error).toMatchObject({ payload: { code: 'claude_auth_failed' } });
-    expect(JSON.stringify(error)).not.toContain(projectRoot);
+    const serialized = JSON.stringify(error);
+    expect(serialized).not.toContain(projectRoot);
+    expect(serialized).not.toContain(normalizedRoot);
+    expect(serialized).not.toContain('secret');
+    expect(serialized).not.toContain(fakeGithubToken);
     expect(session.activeSelectionId).toBeUndefined();
   });
 

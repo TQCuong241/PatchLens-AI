@@ -30,8 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -39,8 +39,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm release:check
-      - if: ${{ inputs.dry_run }}
-        run: pnpm release:dry-run
+      - run: pnpm release:ref-check
+      - run: pnpm release:dry-run
       - if: ${{ ! inputs.dry_run }}
         run: pnpm -r publish --access public --provenance --no-git-checks --tag "${{ inputs.tag }}"
         env:
