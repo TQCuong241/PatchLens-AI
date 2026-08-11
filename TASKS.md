@@ -30,7 +30,7 @@
 - `corepack pnpm exec playwright test --list`: nhận đủ 2 browser tests.
 - `corepack pnpm test:e2e`: xanh; 2 Chromium tests xác nhận click-to-source và Codex managed edit qua Vite HMR, runner thoát sạch và không rò port `4311`.
 - URL boundary regression: CLI host và MCP daemon chỉ chấp nhận plain loopback HTTP origin; credential, path, query và fragment đều bị từ chối.
-- Bằng chứng cloud gần nhất: GitHub CI run `31409105868` xanh trên Node `20.19.0`, Node `24` và Chromium E2E; workflow hiện dùng `actions/checkout@v7`, `actions/setup-node@v7` và chạy artifact smoke trên Node 24.
+- GitHub CI run `31449268858`: xanh trên Node `20.19.0`, Node `24`, Node 24 artifact/consumer smoke và Chromium E2E; workflow dùng `actions/checkout@v7` cùng `actions/setup-node@v7`.
 - Annotated tag `v0.1.0` vẫn bất biến tại commit `9d9494d`; hardening mới dùng version candidate `0.1.1` và release workflow từ chối branch, lightweight tag, tag/version mismatch hoặc tag/commit mismatch.
 - npm registry preflight: `npm org ls patchlens-ai` trả `E404 Scope not found` ngày 2026-08-11, máy hiện tại trả `ENEEDAUTH`, GitHub environment `npm` chưa có `NPM_TOKEN` và tài khoản `thhongphuc` chỉ có role `write`.
 - `release:verify` đã qua mock registry đủ 17 package; success path kiểm integrity, dist-tag, dependency closure, tarball leak và provenance. Production dependency audit, secret scan, tracked artifact scan và conflict-marker scan đều sạch.

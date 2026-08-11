@@ -1,7 +1,7 @@
 # PatchLens AI Roadmap
 
 > Cập nhật: 2026-08-11
-> Trạng thái: source R0–R7 và release candidate `0.1.1` đã qua clean-copy frozen offline install, Node 20.19/24, coverage, 2 Chromium E2E và 17-package artifact/consumer smoke; npm release còn chờ tạo organization `patchlens-ai`, repo administrator thêm `NPM_TOKEN`, publish và verify.
+> Trạng thái: source R0–R7 và release candidate `0.1.1` đã qua clean-copy frozen offline install, local/GitHub CI Node 20.19/24, coverage, 2 Chromium E2E và 17-package artifact/consumer smoke; npm release còn chờ tạo organization `patchlens-ai`, repo administrator thêm `NPM_TOKEN`, publish và verify.
 
 ## 1. Trạng thái hiện tại
 
@@ -26,7 +26,7 @@
 
 ### Kết luận
 
-Critical path, clean-copy validation, local Node 20.19/24 gates, 2 Chromium E2E và release candidate `0.1.1` artifact smoke đã hoàn tất. Tag `v0.1.0` vẫn bất biến tại release candidate cũ; việc còn lại là xác nhận CI cho commit mới, tạo tag `v0.1.1`, tạo npm organization, cấp release secret, publish dist-tag `next` và verify package từ npm.
+Critical path, clean-copy validation, local/GitHub CI Node 20.19/24 gates, 2 Chromium E2E và release candidate `0.1.1` artifact smoke đã hoàn tất. Tag `v0.1.0` vẫn bất biến tại release candidate cũ; release line mới dùng annotated tag `v0.1.1`. Việc phụ thuộc bên ngoài còn lại là tạo npm organization, cấp release secret, publish dist-tag `next` và verify package từ npm.
 
 ## 2. Rủi ro cần xử lý sớm
 
