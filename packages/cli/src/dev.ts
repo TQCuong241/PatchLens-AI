@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -10,6 +9,7 @@ import { removePatchLensSession, writePatchLensSession } from '@patchlens-ai/mcp
 import { createStudioServer } from '@patchlens-ai/studio/server';
 
 import { discoverAndLoadConfig } from './config.js';
+import { spawnExternal } from './external-process.js';
 
 export type DevelopmentOptions = {
   cwd?: string;
@@ -185,7 +185,7 @@ function stopReasonError(reason: Extract<StopReason, { type: 'host-error' | 'hos
 }
 
 function startHostProcess(command: string, args: string[], cwd: string): ChildProcess {
-  return spawn(resolveExecutable(command), args, {
+  return spawnExternal(command, args, {
     cwd,
     env: { ...process.env, FORCE_COLOR: '1' },
     stdio: 'inherit',
@@ -220,7 +220,7 @@ async function terminateChild(child: ChildProcess): Promise<void> {
 
   if (process.platform === 'win32') {
     const terminatedTree = await new Promise<boolean>((resolveTermination) => {
-      const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/T', '/F'], {
+      const killer = spawnExternal('taskkill.exe', ['/pid', String(child.pid), '/T', '/F'], {
         stdio: 'ignore',
         windowsHide: true,
       });
@@ -305,16 +305,6 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
 function getUrlPort(value: string): number {
   const url = new URL(value);
   return Number.parseInt(url.port || '80', 10);
-}
-
-function resolveExecutable(command: string): string {
-  if (process.platform !== 'win32') {
-    return command;
-  }
-  if (['corepack', 'npm', 'pnpm', 'yarn'].includes(command)) {
-    return `${command}.cmd`;
-  }
-  return command;
 }
 
 function delay(timeoutMs: number): Promise<void> {

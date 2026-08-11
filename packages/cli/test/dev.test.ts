@@ -77,6 +77,37 @@ describe('patchlens dev', () => {
     }
   });
 
+  it.skipIf(process.platform !== 'win32')('starts Windows command shims', async () => {
+    const root = await createProject();
+    const [hostPort, studioPort, daemonPort] = await reservePorts(3);
+    const hostScriptPath = join(root, 'host.cjs');
+    const hostCommandPath = join(root, 'host.cmd');
+    const controller = new AbortController();
+    await writeFile(hostScriptPath, createHttpServerScript(hostPort));
+    await writeFile(hostCommandPath, `@echo off\r\n"${process.execPath}" "%~dp0host.cjs"\r\n`);
+    await writeConfig(root, {
+      hostPort,
+      studioPort,
+      daemonPort,
+      hostCommand: hostCommandPath,
+      hostArgs: [],
+    });
+
+    const session = await runDevelopment({
+      cwd: root,
+      signal: controller.signal,
+      hostTimeoutMs: 5_000,
+      output: (message) => {
+        if (message.startsWith('MCP session:')) {
+          controller.abort();
+        }
+      },
+    });
+
+    expect(session.previewUrl).toBe(`http://127.0.0.1:${hostPort}`);
+    await expectPortsAvailable([hostPort, studioPort, daemonPort]);
+  });
+
   it('terminates a host process after readiness timeout', async () => {
     const root = await createProject();
     const [hostPort, studioPort, daemonPort] = await reservePorts(3);
@@ -110,7 +141,14 @@ async function createProject(): Promise<string> {
 
 async function writeConfig(
   root: string,
-  options: { hostPort: number; studioPort: number; daemonPort: number; hostScript: string },
+  options: {
+    hostPort: number;
+    studioPort: number;
+    daemonPort: number;
+    hostScript?: string;
+    hostCommand?: string;
+    hostArgs?: string[];
+  },
 ): Promise<void> {
   await writeFile(
     join(root, 'patchlens.config.json'),
@@ -120,8 +158,8 @@ async function writeConfig(
         projectRoot: '.',
         host: {
           start: true,
-          command: process.execPath,
-          args: ['-e', options.hostScript],
+          command: options.hostCommand ?? process.execPath,
+          args: options.hostArgs ?? ['-e', options.hostScript ?? ''],
           url: `http://127.0.0.1:${options.hostPort}`,
         },
         studio: { port: options.studioPort },

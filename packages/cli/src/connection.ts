@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { chmod, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { discoverPatchLensSession, loadPatchLensSession } from '@patchlens-ai/mcp-server';
 
 import { discoverAndLoadConfig } from './config.js';
+import { spawnExternal } from './external-process.js';
 
 export const PATCHLENS_CONNECTION_SCHEMA_VERSION = 1;
 export const PATCHLENS_CODEX_CONNECTION_RELATIVE_PATH = '.patchlens/connections/codex.json';
@@ -135,7 +135,7 @@ export async function disconnectAttachedAgent(
   }
 
   const commandRunner = options.commandRunner ?? defaultCommandRunner;
-  const codexExecutable = options.codexExecutable ?? resolveExecutable('codex');
+  const codexExecutable = options.codexExecutable ?? 'codex';
   const installedServer = await findCodexServer(
     commandRunner,
     codexExecutable,
@@ -177,7 +177,7 @@ export async function inspectAttachedAgent(
 
   const installedServer = await findCodexServer(
     options.commandRunner ?? defaultCommandRunner,
-    options.codexExecutable ?? resolveExecutable('codex'),
+    options.codexExecutable ?? 'codex',
     projectRoot,
     serverName,
   );
@@ -240,7 +240,7 @@ async function resolveConnectionContext(
     command: process.execPath,
     args: [mcpBinPath, '--session', resolve(sessionPath)],
     commandRunner: options.commandRunner ?? defaultCommandRunner,
-    codexExecutable: options.codexExecutable ?? resolveExecutable('codex'),
+    codexExecutable: options.codexExecutable ?? 'codex',
   };
 }
 
@@ -250,7 +250,7 @@ function resolveDefaultMcpBinPath(): string {
 }
 
 const defaultCommandRunner: ExternalCommandRunner = (command, args, options) => {
-  const result = spawnSync(command, [...args], {
+  const result = spawnExternal.sync(command, [...args], {
     cwd: options.cwd,
     encoding: 'utf8',
     windowsHide: true,
@@ -404,10 +404,6 @@ function requireSupportedAgent(agent: AttachedAgentId): void {
   if (agent !== 'codex') {
     throw new Error(`Unsupported attached agent: ${agent}`);
   }
-}
-
-function resolveExecutable(command: string): string {
-  return process.platform === 'win32' ? `${command}.cmd` : command;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -21,7 +21,8 @@
   "dependencies": {
     "@patchlens-ai/daemon": "workspace:*",
     "@patchlens-ai/mcp-server": "workspace:*",
-    "@patchlens-ai/studio": "workspace:*"
+    "@patchlens-ai/studio": "workspace:*",
+    "cross-spawn": "^7.0.6"
   },
   "description": "CLI orchestration commands for PatchLens AI development sessions.",
   "keywords": [

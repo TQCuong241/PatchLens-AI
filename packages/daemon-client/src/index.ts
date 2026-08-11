@@ -67,7 +67,7 @@ export class DaemonClient {
       throw new Error('Daemon session token is required');
     }
     this.#token = options.token;
-    this.#fetch = options.fetchImplementation ?? fetch;
+    this.#fetch = options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
   }
 
   async health(): Promise<DaemonHealth> {

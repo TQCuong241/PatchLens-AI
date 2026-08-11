@@ -27,6 +27,34 @@ describe('DaemonClient', () => {
     await expect(client.health()).resolves.toMatchObject({ ok: true });
   });
 
+  it('binds the default fetch implementation to globalThis', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async function (this: unknown) {
+      expect(this).toBe(globalThis);
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          service: 'patchlens-daemon',
+          version: '0.0.0',
+          protocolVersion: PATCHLENS_PROTOCOL_VERSION,
+          providers: [{ id: 'mock', status: 'available' }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    } as typeof fetch;
+
+    try {
+      const client = new DaemonClient({
+        baseUrl: 'http://127.0.0.1:4312',
+        token: 'test-token',
+      });
+
+      await expect(client.health()).resolves.toMatchObject({ ok: true });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('validates active selection responses', async () => {
     const client = new DaemonClient({
       baseUrl: 'http://127.0.0.1:4312',

@@ -1,10 +1,10 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { basename, extname, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 import { discoverAndLoadConfig, type ResolvedPatchLensConfig } from './config.js';
 import { inspectAttachedAgent } from './connection.js';
+import { spawnExternal } from './external-process.js';
 
 export type DoctorStatus = 'pass' | 'warn' | 'fail';
 
@@ -124,12 +124,12 @@ async function checkProjectRoot(config: ResolvedPatchLensConfig): Promise<Doctor
 }
 
 function checkPackageManager(config: ResolvedPatchLensConfig): DoctorCheck {
-  const executable = resolveExecutable(config.host.command);
+  const executable = config.host.command;
   const versionArguments =
     config.host.command === 'corepack' && config.host.args[0]
       ? [config.host.args[0], '--version']
       : ['--version'];
-  const result = spawnSync(executable, versionArguments, {
+  const result = spawnExternal.sync(executable, versionArguments, {
     cwd: config.resolvedProjectRoot,
     encoding: 'utf8',
     windowsHide: true,
@@ -445,16 +445,6 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   } finally {
     clearTimeout(timer);
   }
-}
-
-function resolveExecutable(command: string): string {
-  if (process.platform !== 'win32') {
-    return command;
-  }
-  if (['corepack', 'npm', 'pnpm', 'yarn'].includes(command)) {
-    return `${command}.cmd`;
-  }
-  return command;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
